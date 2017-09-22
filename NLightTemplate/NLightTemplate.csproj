@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard1.0;net45</TargetFrameworks>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.0</Version>
+    <Authors>Kyle Manuel</Authors>
+    <Company>Antares, LLC</Company>
+    <PackageProjectUrl>https://github.com/kylepmanuel/nlighttemplate</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/kylepmanuel/nlighttemplate/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageTags>template email stringtemplate</PackageTags>
+    <Description>NLightTemplate is a lightweight string template renderer with a simple syntax similar to C# 6 interpolation.</Description>
+    <Copyright>© 2017 Antares, LLC</Copyright>
+    <IncludeDocumentationProjectOutputGroup>True</IncludeDocumentationProjectOutputGroup>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\NLightTemplate.xml</DocumentationFile>
+  </PropertyGroup>
+
+</Project>
