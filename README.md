@@ -155,3 +155,8 @@ string template = @"
 var extras = new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } };
 Console.WriteLine(StringTemplate.Render(template, BuildDemoCustomer(), extras));
 ```
+## Roadmap
+
+Plans for the next version:
+* Validate and write tests for custom implementations of IEnumerable
+* Add support for ```string.Format``` style format patterns and padding
