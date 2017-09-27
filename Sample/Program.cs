@@ -9,6 +9,8 @@ namespace Sample
     {
         static void Main(string[] args)
         {
+            var customer = BuildDemoCustomer();
+
             string template = @"Thank you {FullName} for your recent order(s):
                 email: {emailAddress}
                 something unknown: {idunno}
@@ -29,7 +31,49 @@ namespace Sample
                 {/foreach Details}
 					                Total: 	{SubTotal}
                 {/foreach Orders}";
-            Console.WriteLine(StringTemplate.Render(template, BuildDemoCustomer(), new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } }));
+            Console.WriteLine(StringTemplate.Render(template, customer, new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } }));
+
+
+            string template2 = @"Thank you <%FullName%> for your recent order(s):
+                something unknown: <%idunno%>
+
+                <%fe Orders%>
+                Order <%Id%> placed at <%Placed%> and Shipped <%Shipped%>
+                QTY	Product		 Price SubTotal
+                <%fe Details%>
+                <%Quantity%>	<%Product.Name%>	 <%UnitPrice%> 	<%SubTotal%>
+                <%/fe Details%>
+			                Total: <%SubTotal%>
+                <%/fe Orders%>
+                <%fe Orders%>
+                This is the 2nd list for Order: <%Id%>
+                QTY	Product		 Price SubTotal
+                <%fe Details%>
+                <%Quantity%>	<%Product%>	 <%UnitPrice%> 	<%SubTotal%>
+                <%/fe Details%>
+					                Total: 	<%SubTotal%>
+                <%/fe Orders%>";
+
+            //Override the default with a custom configuration using the fluent configuration
+            var cfg = new FluentStringTemplateConfiguration().OpenToken("<%").CloseToken("%>").ForeachToken("fe").ExposeConfiguration();
+            Console.WriteLine(StringTemplate.Render(template2, customer, new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } }, cfg));
+
+            //Override the default for all future renders with a custom configuration using the fluent configuration
+            StringTemplate.Configure.OpenToken("<%").CloseToken("%>").ForeachToken("fe");
+            Console.WriteLine(StringTemplate.Render(template2, customer, new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } }));
+
+            //Override the custom configuration with the default
+            Console.WriteLine(StringTemplate.Render(template, customer, new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } }, new StringTemplateConfiguration()));
+
+            //Override the global configuration old school style
+            Console.WriteLine(StringTemplate.Render(template2, customer, new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } },
+                new StringTemplateConfiguration
+                {
+                    OpenToken = "<%",
+                    CloseToken = "%>",
+                    ForeachToken = "fe"
+                }));
+
             Console.ReadLine();
         }
         private static Customer BuildDemoCustomer()

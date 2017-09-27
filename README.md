@@ -10,14 +10,14 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
  * Reflection-based POCO key:value replacement
  * Nested enumeration
  * Dot notation property accessors for reference types
- * Familiar syntax+
+ * Familiar syntax (using default configuration)
 
 ## Get It
 ##### Direct Download
 [ NuGet](https://www.nuget.org/packages/NLightTemplate)
 
 ##### Package Manger
-```PM> Install-Package NLightTemplate -Version 1.0.0```
+```PM> Install-Package NLightTemplate```
 ##### .NET CLI
 ```> dotnet add package NLightTemplate```
 ## Dependencies
@@ -29,7 +29,29 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
 
 
 ## Syntax
-The renderer uses token replacement with curly braces ```{``` and ```}``` surrounding the key.
+The renderer uses token replacement with curly braces ```{``` and ```}``` surrounding the key by default.
+
+A global custom configuration may be set at any time using the fluent interface.  This should only be done once during the application initialization process.
+```cs
+StringTemplate.Configure.OpenToken("<%").CloseToken("%>").ForeachToken("fe");
+```
+
+A custom configuration may be set on an individual call by passing a configuration object into the ```Render``` method.
+```cs
+var cfg = new FluentStringTemplateConfiguration()
+	.OpenToken("<%")
+    .CloseToken("%>")
+    .ForeachToken("fe")
+    .ExposeConfiguration();
+//or
+var cfg = new StringTemplateConfiguration
+            {
+              OpenToken = "<%",
+              CloseToken = "%>",
+              ForeachToken = "fe"
+            };
+var body = StringTemplate.Render(template, customer, cfg);
+```
 
 #### Basic usage
 ```cs
