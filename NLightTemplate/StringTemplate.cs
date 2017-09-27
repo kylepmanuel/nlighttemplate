@@ -12,13 +12,26 @@ namespace NLightTemplate
     /// </summary>
     public static class StringTemplate
     {
+        private static StringTemplateConfiguration _cfg = new StringTemplateConfiguration();
+        /// <summary>
+        /// The global <see cref="FluentStringTemplateConfiguration"/>
+        /// </summary>
+        public static FluentStringTemplateConfiguration Configure { get; private set; } =  new FluentStringTemplateConfiguration(_cfg);
         /// <summary>
         /// Renders a string template using the supplied object
         /// </summary>
         /// <param name="template">the template</param>
         /// <param name="obj">any POCO</param>
         /// <returns></returns>
-        public static string Render(string template, object obj) => ReplaceText(template, BuildPropertyDictionary(obj));
+        public static string Render(string template, object obj) => ReplaceText(template, BuildPropertyDictionary(obj), _cfg);
+        /// <summary>
+        /// Renders a string template using the supplied object
+        /// </summary>
+        /// <param name="template">the template</param>
+        /// <param name="obj">any POCO</param>
+        /// <param name="cfg">override configuration</param>
+        /// <returns></returns>
+        public static string Render(string template, object obj, StringTemplateConfiguration cfg) => ReplaceText(template, BuildPropertyDictionary(obj), cfg);
         /// <summary>
         /// Renders a string template using the supplied object
         /// </summary>
@@ -26,15 +39,32 @@ namespace NLightTemplate
         /// <param name="obj">any POCO</param>
         /// <param name="replacements">additional dictionary of replacement values</param>
         /// <returns></returns>
-        public static string Render(string template, object obj, Dictionary<string, object> replacements) => ReplaceText(template, BuildPropertyDictionary(obj).Union(replacements).ToDictionary(x => x.Key, x => x.Value));
+        public static string Render(string template, object obj, Dictionary<string, object> replacements) => ReplaceText(template, BuildPropertyDictionary(obj).Union(replacements).ToDictionary(x => x.Key, x => x.Value), _cfg);
+        /// <summary>
+        /// Renders a string template using the supplied object
+        /// </summary>
+        /// <param name="template">the template</param>
+        /// <param name="obj">any POCO</param>
+        /// <param name="replacements">additional dictionary of replacement values</param>
+        /// <param name="cfg">override configuration</param>
+        /// <returns></returns>
+        public static string Render(string template, object obj, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) 
+            => ReplaceText(template, BuildPropertyDictionary(obj).Union(replacements).ToDictionary(x => x.Key, x => x.Value), cfg);
         /// <summary>
         /// Renders a string template using the supplied object
         /// </summary>
         /// <param name="template">the template</param>
         /// <param name="replacements">dictionary of replacement values</param>
         /// <returns></returns>
-        public static string Render(string template, Dictionary<string, object> replacements) => ReplaceText(template, replacements);
-
+        public static string Render(string template, Dictionary<string, object> replacements) => ReplaceText(template, replacements, _cfg);
+        /// <summary>
+        /// Renders a string template using the supplied object
+        /// </summary>
+        /// <param name="template">the template</param>
+        /// <param name="replacements">dictionary of replacement values</param>
+        /// <param name="cfg">override configuration</param>
+        /// <returns></returns>
+        public static string Render(string template, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) => ReplaceText(template, replacements, cfg);
         /// <summary>
         /// Builds a property dictionary of key:value from the object instance
         /// </summary>
@@ -54,19 +84,31 @@ namespace NLightTemplate
             return CollectProperties(string.Empty, obj).ToDictionary(x => x.Key, x => x.Value);
         }
 
-        internal static string ReplaceText(string text, Dictionary<string, object> replacements) =>
+        /// <summary>
+        /// This performs all of the token replacements and recursion
+        /// </summary>
+        /// <param name="text">The snippet to process for the supplied replacements</param>
+        /// <param name="replacements">The replacements</param>
+        /// <param name="cfg">The configuration</param>
+        /// <returns></returns>
+        internal static string ReplaceText(string text, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) =>
             replacements.ToList().OrderBy((kvp) => (kvp.Value is IEnumerable && kvp.Value.GetType() != typeof(string)) ? 1 : 2).Aggregate(text, (c, k) =>
-                (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{{foreach {k.Key}}}") >= 0 && c.IndexOf($"{{/foreach {k.Key}}}") > 0) ?
+                (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") >= 0 && c.IndexOf($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") > 0) ?
                     new Regex(string.Format(
                             @"{0}(?<inner>(?>{0}(?<LEVEL>)|{1}(?<-LEVEL>)|(?!{0}|{1}).)+(?(LEVEL)(?!))){1}",
-                            $@"{{foreach\s{k.Key}}}",
-                            $@"{{/foreach\s{k.Key}}}"
+                            string.Join("",$@"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}")),
+                            string.Join("",$@"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}"))
                             ),
                         RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline)
                     .Matches(text).Cast<Match>().Aggregate(c, (prev, match) => prev.Replace(match.Captures[0].Value,
-                        string.Join("", enumerable.Cast<object>().Select(item => ReplaceText(match.Groups[1].Value, BuildPropertyDictionary(item))))))
+                        string.Join("", enumerable.Cast<object>().Select(item => ReplaceText(match.Groups[1].Value, BuildPropertyDictionary(item), cfg)))))
                 :
-                c.Replace($"{{{k.Key}}}", k.Value?.ToString() ?? string.Empty)
+                ReplaceToken(c, k.Key, k.Value, cfg)
             );
+
+        internal static string ReplaceToken(string original, string key, object value, StringTemplateConfiguration cfg)
+        {
+            return original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty);
+        }
     }
 }
