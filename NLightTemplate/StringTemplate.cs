@@ -16,7 +16,7 @@ namespace NLightTemplate
         /// <summary>
         /// The global <see cref="FluentStringTemplateConfiguration"/>
         /// </summary>
-        public static FluentStringTemplateConfiguration Configure { get; private set; } =  new FluentStringTemplateConfiguration(_cfg);
+        public static FluentStringTemplateConfiguration Configure { get; private set; } = new FluentStringTemplateConfiguration(_cfg);
         /// <summary>
         /// Renders a string template using the supplied object
         /// </summary>
@@ -48,7 +48,7 @@ namespace NLightTemplate
         /// <param name="replacements">additional dictionary of replacement values</param>
         /// <param name="cfg">override configuration</param>
         /// <returns></returns>
-        public static string Render(string template, object obj, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) 
+        public static string Render(string template, object obj, Dictionary<string, object> replacements, StringTemplateConfiguration cfg)
             => ReplaceText(template, BuildPropertyDictionary(obj).Union(replacements).ToDictionary(x => x.Key, x => x.Value), cfg);
         /// <summary>
         /// Renders a string template using the supplied object
@@ -75,7 +75,7 @@ namespace NLightTemplate
             string prefix(string p) => string.IsNullOrEmpty(p) ? "" : $"{p}.";
 
             IEnumerable<KeyValuePair<string, object>> CollectProperties(string pre, object o) =>
-                o.GetType().GetTypeInfo().DeclaredProperties.Where(p => p.CanRead)
+                o.GetType().GetTypeInfo().DeclaredProperties.Where(p => p.GetMethod?.IsPublic ?? false)
                     .SelectMany(prop => new[] { new KeyValuePair<string, object>($"{prefix(pre)}{prop.Name}", prop.GetValue(o)) }
                     .Concat((prop.PropertyType.GetTypeInfo().IsClass && prop.PropertyType != typeof(string) && !typeof(IEnumerable).GetTypeInfo().IsAssignableFrom(prop.PropertyType.GetTypeInfo())) ?
                         CollectProperties($"{prefix(pre)}{prop.Name}", prop.GetValue(o))
@@ -96,8 +96,8 @@ namespace NLightTemplate
                 (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") >= 0 && c.IndexOf($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") > 0) ?
                     new Regex(string.Format(
                             @"{0}(?<inner>(?>{0}(?<LEVEL>)|{1}(?<-LEVEL>)|(?!{0}|{1}).)+(?(LEVEL)(?!))){1}",
-                            string.Join("",$@"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}")),
-                            string.Join("",$@"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}"))
+                            string.Join("", $@"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}")),
+                            string.Join("", $@"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}"))
                             ),
                         RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline)
                     .Matches(text).Cast<Match>().Aggregate(c, (prev, match) => prev.Replace(match.Captures[0].Value,
@@ -108,7 +108,25 @@ namespace NLightTemplate
 
         internal static string ReplaceToken(string original, string key, object value, StringTemplateConfiguration cfg)
         {
-            return original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty);
+            var typeInfo = value?.GetType().GetTypeInfo();
+            var toStringMethod = (typeInfo?.IsEnum ?? false ? typeInfo?.BaseType.GetTypeInfo() : typeInfo)?
+                .GetDeclaredMethods("ToString")
+                .Where(p =>
+                    p.GetParameters().Select(q => q.ParameterType).SequenceEqual(new Type[] { typeof(string) })
+                ).FirstOrDefault();
+
+            return Regex.Matches((original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty))
+                    , $@"{cfg.OpenToken}(?<key>{key})(,(?<pad>-*?\d+))*?(:(?<fmt>[^}}]+))*?{cfg.CloseToken}")
+                .Cast<Match>()
+                .Aggregate(original, (s, match) =>
+            {
+                var v = toStringMethod == null ? value?.ToString() : toStringMethod.Invoke(value, new[] { match.Groups["fmt"]?.Value ?? string.Empty }) as string;
+                if (int.TryParse(match.Groups["pad"]?.Value ?? string.Empty, out int padding))
+                {
+                    v = padding < 0 ? v.PadRight(Math.Abs(padding)) : v.PadLeft(Math.Abs(padding));
+                }
+                return s.Replace(match.Value, v);
+            });
         }
     }
 }
