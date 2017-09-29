@@ -14,7 +14,7 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
 
 ## Get It
 ##### Direct Download
-[ NuGet](https://www.nuget.org/packages/NLightTemplate)
+[NuGet](https://www.nuget.org/packages/NLightTemplate)
 
 ##### Package Manger
 ```PM> Install-Package NLightTemplate```
@@ -51,6 +51,14 @@ var cfg = new StringTemplateConfiguration
               ForeachToken = "fe"
             };
 var body = StringTemplate.Render(template, customer, cfg);
+```
+
+Version 1.0.2 added support for [string.Format](https://msdn.microsoft.com/en-us/library/system.string.format%28v=vs.110%29.aspx?f=255&MSPPError=-2147217396) syntax for padding and format.
+```cs
+var d = DateTime.Now;
+var s = string.Format("{0,15:d MMM yyyy}", d);
+var t = StringTemplate.Render("{MyDate,15:d MMM yyyy}", new { MyDate = d });
+Console.WriteLine(s == t); // outputs True
 ```
 
 #### Basic usage
@@ -179,6 +187,5 @@ Console.WriteLine(StringTemplate.Render(template, BuildDemoCustomer(), extras));
 ```
 ## Roadmap
 
-Plans for the next version:
-* Validate and write tests for custom implementations of IEnumerable
-* Add support for ```string.Format``` style format patterns and padding
+- [ ] Validate and write tests for custom implementations of IEnumerable
+- [x] Add support for ```string.Format``` style format patterns and padding (added in v1.0.2)

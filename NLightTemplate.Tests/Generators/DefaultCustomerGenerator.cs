@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NLightTemplate.Tests
+namespace NLightTemplate.Tests.Generators
 {
     public class DefaultCustomerGenerator : IEnumerable<object[]>
     {

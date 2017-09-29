@@ -1,3 +1,4 @@
+using NLightTemplate.Tests.Generators;
 using Xunit;
 
 namespace NLightTemplate.Tests
@@ -16,6 +17,13 @@ namespace NLightTemplate.Tests
         public void EnsureFluentConfigurationRenders(object input, StringTemplateConfiguration cfg, string template, string expected)
         {
             Assert.Equal(expected, StringTemplate.Render(template, input, cfg));
+        }
+
+        [Theory]
+        [ClassData(typeof(FormatObjectsGenerator))]
+        public void EnsureFormatAndPaddingRenders(object input, string template, string expected)
+        {
+            Assert.Equal(expected, StringTemplate.Render(template, input));
         }
     }
 }
