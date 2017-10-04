@@ -16,7 +16,7 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
 ##### Direct Download
 [NuGet](https://www.nuget.org/packages/NLightTemplate)
 
-##### Package Manger
+##### Package Manager
 ```PM> Install-Package NLightTemplate```
 ##### .NET CLI
 ```> dotnet add package NLightTemplate```
