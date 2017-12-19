@@ -115,6 +115,15 @@ namespace NLightTemplate
                     p.GetParameters().Select(q => q.ParameterType).SequenceEqual(new Type[] { typeof(string) })
                 ).FirstOrDefault();
 
+            original = (value is bool condition && original.IndexOf($"{cfg.OpenToken}{cfg.IfToken} {key}{cfg.CloseToken}") >= 0 && original.IndexOf($"{cfg.OpenToken}/{cfg.IfToken} {key}{cfg.CloseToken}") > 0) ?
+                new Regex(string.Format(
+                            @"{0}(?<inner>(?>{0}(?<LEVEL>)|{1}(?<-LEVEL>)|(?!{0}|{1}).)+(?(LEVEL)(?!))){1}",
+                            string.Join("", $@"{cfg.OpenToken}{cfg.IfToken} {key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}")),
+                            string.Join("", $@"{cfg.OpenToken}/{cfg.IfToken} {key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{((int)ch).ToString("X4")}"))
+                            ),
+                        RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline)
+                    .Matches(original).Cast<Match>().Aggregate(original, (prev, match) => prev.Replace(match.Captures[0].Value, condition ? match.Groups[1].Value : string.Empty)) : original;
+
             return Regex.Matches((original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty))
                     , $@"{cfg.OpenToken}(?<key>{key})(,(?<pad>-*?\d+))*?(:(?<fmt>[^}}]+))*?{cfg.CloseToken}")
                 .Cast<Match>()

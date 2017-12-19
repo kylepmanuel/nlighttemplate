@@ -21,6 +21,10 @@ namespace NLightTemplate
         /// The Foreach token (default "foreach")
         /// </summary>
         public string ForeachToken { get; set; } = "foreach";
+        /// <summary>
+        /// The If token (default "if")
+        /// </summary>
+        public string IfToken { get; set; } = "if";
     }
 
     /// <summary>
@@ -70,6 +74,16 @@ namespace NLightTemplate
         public FluentStringTemplateConfiguration ForeachToken(string foreachToken)
         {
             _cfg.ForeachToken = foreachToken;
+            return this;
+        }
+        /// <summary>
+        /// Sets te If Token <see cref="StringTemplateConfiguration.IfToken"/>
+        /// </summary>
+        /// <param name="ifToken">The If Token</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration IfToken(string ifToken)
+        {
+            _cfg.IfToken = ifToken;
             return this;
         }
         /// <summary>

@@ -16,4 +16,8 @@
     <ProjectReference Include="..\NLightTemplate\NLightTemplate.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="NLightTemplate\Tests\Generators\" />
+  </ItemGroup>
+
 </Project>

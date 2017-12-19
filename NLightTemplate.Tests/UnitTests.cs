@@ -25,5 +25,12 @@ namespace NLightTemplate.Tests
         {
             Assert.Equal(expected, StringTemplate.Render(template, input));
         }
+
+        [Theory]
+        [ClassData(typeof(Generators.IfTestGenerator))]
+        public void EnsureIfTestRenders(object input, string template, string expected)
+        {
+            Assert.Equal(expected, StringTemplate.Render(template, input));
+        }
     }
 }
