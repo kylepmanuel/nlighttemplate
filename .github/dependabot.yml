@@ -6,10 +6,20 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      # Batch all minor/patch bumps into a single PR; majors still come one-per-PR so they can be reviewed on their own.
+      nuget-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Keep the GitHub Actions used in the workflows below up to date.
+  # Keep the GitHub Actions used in the workflows up to date (batched into one PR).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
