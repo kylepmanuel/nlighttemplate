@@ -5,9 +5,27 @@ using System.Text;
 namespace NLightTemplate
 {
     /// <summary>
+    /// Read-only view of the <see cref="StringTemplate"/> token configuration. Useful as a dependency-injection
+    /// abstraction; the concrete <see cref="StringTemplateConfiguration"/> implements it.
+    /// </summary>
+    public interface IStringTemplateConfiguration
+    {
+        /// <summary>The Open token (default "{")</summary>
+        string OpenToken { get; }
+        /// <summary>The Close token (default "}")</summary>
+        string CloseToken { get; }
+        /// <summary>The Foreach token (default "foreach")</summary>
+        string ForeachToken { get; }
+        /// <summary>The If token (default "if")</summary>
+        string IfToken { get; }
+        /// <summary>The Else token (default "else")</summary>
+        string ElseToken { get; }
+    }
+
+    /// <summary>
     /// Configuration options for <see cref="StringTemplate"/>
     /// </summary>
-    public class StringTemplateConfiguration
+    public class StringTemplateConfiguration : IStringTemplateConfiguration
     {
         /// <summary>
         /// The Open token (default "{")
@@ -25,6 +43,24 @@ namespace NLightTemplate
         /// The If token (default "if")
         /// </summary>
         public string IfToken { get; set; } = "if";
+        /// <summary>
+        /// The Else token (default "else")
+        /// </summary>
+        public string ElseToken { get; set; } = "else";
+
+        /// <summary>
+        /// Builds a <see cref="StringTemplateConfiguration"/> using the fluent interface. Convenient for
+        /// dependency-injection registration, e.g. <c>services.AddSingleton&lt;IStringTemplateConfiguration&gt;(_ =&gt;
+        /// StringTemplateConfiguration.Create(c =&gt; c.OpenToken("&lt;%").CloseToken("%&gt;")))</c>.
+        /// </summary>
+        /// <param name="configure">Callback that configures the tokens via the fluent interface</param>
+        /// <returns>The configured <see cref="StringTemplateConfiguration"/></returns>
+        public static StringTemplateConfiguration Create(Action<FluentStringTemplateConfiguration> configure)
+        {
+            var cfg = new StringTemplateConfiguration();
+            configure?.Invoke(new FluentStringTemplateConfiguration(cfg));
+            return cfg;
+        }
     }
 
     /// <summary>
@@ -84,6 +120,16 @@ namespace NLightTemplate
         public FluentStringTemplateConfiguration IfToken(string ifToken)
         {
             _cfg.IfToken = ifToken;
+            return this;
+        }
+        /// <summary>
+        /// Sets the Else Token <see cref="StringTemplateConfiguration.ElseToken"/>
+        /// </summary>
+        /// <param name="elseToken">The Else Token</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration ElseToken(string elseToken)
+        {
+            _cfg.ElseToken = elseToken;
             return this;
         }
         /// <summary>

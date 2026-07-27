@@ -20,15 +20,15 @@ namespace NLightTemplate.Tests
                 Id = 1,
                 FirstName = "John",
                 LastName = "Doe",
-                Orders = new List<Order>()
-                {
+                Orders =
+                [
                     new Order
                     {
                         Id = 123,
                         CustomerId = 12345,
                         Placed = DateTime.Parse("9/19/2017 4:47:40 PM"),
-                        Details = new List<OrderDetail>()
-                        {
+                        Details =
+                        [
                             new OrderDetail
                             {
                                 Id = 12345,
@@ -54,15 +54,15 @@ namespace NLightTemplate.Tests
                                     Name = "White Socks"
                                 }
                             }
-                        }
+                        ]
                     },
                     new Order
                     {
                         Id = 124,
                         CustomerId = 12345,
                         Placed = DateTime.Parse("9/19/2017 4:47:40 PM"),
-                        Details = new List<OrderDetail>()
-                        {
+                        Details =
+                        [
                             new OrderDetail
                             {
                                 Id = 12347,
@@ -88,9 +88,9 @@ namespace NLightTemplate.Tests
                                     IsInStock = true
                                 }
                             }
-                        }
+                        ]
                     }
-                }
+                ]
             };
         }
     }

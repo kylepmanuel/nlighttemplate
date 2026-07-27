@@ -1,0 +1,68 @@
+# EditorConfig for NLightTemplate — https://editorconfig.org
+# Committed so the code-style/naming conventions travel with the repo instead of
+# living only in each developer's Visual Studio settings.
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+end_of_line = crlf
+
+[*.{csproj,props,targets,config,nuspec}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# ---------------------------------------------------------------------------
+# Naming conventions
+#
+# Rules are matched top-to-bottom; the first rule whose symbol group matches a
+# symbol wins, so the most specific groups (e.g. constants) come first.
+# ---------------------------------------------------------------------------
+
+# Symbol groups
+dotnet_naming_symbols.constants.applicable_kinds           = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers         = const
+
+dotnet_naming_symbols.private_internal_fields.applicable_kinds           = field
+dotnet_naming_symbols.private_internal_fields.applicable_accessibilities = private, internal
+
+dotnet_naming_symbols.pascal_members.applicable_kinds           = property, method, event, class, struct, interface, enum, delegate, namespace
+dotnet_naming_symbols.pascal_members.applicable_accessibilities = *
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds           = parameter, local
+dotnet_naming_symbols.parameters_and_locals.applicable_accessibilities = *
+
+# Styles
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization  = camel_case
+
+# Rules
+dotnet_naming_rule.constants_are_pascal_case.symbols  = constants
+dotnet_naming_rule.constants_are_pascal_case.style    = pascal_case
+dotnet_naming_rule.constants_are_pascal_case.severity = suggestion
+
+dotnet_naming_rule.private_internal_fields_are_underscore_camel.symbols  = private_internal_fields
+dotnet_naming_rule.private_internal_fields_are_underscore_camel.style    = underscore_camel_case
+dotnet_naming_rule.private_internal_fields_are_underscore_camel.severity = suggestion
+
+dotnet_naming_rule.members_are_pascal_case.symbols  = pascal_members
+dotnet_naming_rule.members_are_pascal_case.style    = pascal_case
+dotnet_naming_rule.members_are_pascal_case.severity = suggestion
+
+dotnet_naming_rule.parameters_and_locals_are_camel_case.symbols  = parameters_and_locals
+dotnet_naming_rule.parameters_and_locals_are_camel_case.style    = camel_case
+dotnet_naming_rule.parameters_and_locals_are_camel_case.severity = suggestion

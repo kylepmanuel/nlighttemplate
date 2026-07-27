@@ -83,15 +83,15 @@ namespace Sample
                 Id = 1,
                 FirstName = "John",
                 LastName = "Doe",
-                Orders = new List<Order>()
-                {
+                Orders =
+                [
                     new Order
                     {
                         Id = 123,
                         CustomerId = 12345,
                         Placed = DateTime.Now.AddDays(-3),
-                        Details = new List<OrderDetail>()
-                        {
+                        Details =
+                        [
                             new OrderDetail
                             {
                                 Id = 12345,
@@ -117,15 +117,15 @@ namespace Sample
                                     Name = "White Socks"
                                 }
                             }
-                        }
+                        ]
                     },
                     new Order
                     {
                         Id = 124,
                         CustomerId = 12345,
                         Placed = DateTime.Now.AddDays(-1),
-                        Details = new List<OrderDetail>()
-                        {
+                        Details =
+                        [
                             new OrderDetail
                             {
                                 Id = 12347,
@@ -151,9 +151,9 @@ namespace Sample
                                     IsInStock = true
                                 }
                             }
-                        }
+                        ]
                     }
-                }
+                ]
             };
         }
     }
