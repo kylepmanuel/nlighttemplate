@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The DI container is referenced by the SAMPLE, not by NLightTemplate itself. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NLightTemplate\NLightTemplate.csproj" />
   </ItemGroup>
 
