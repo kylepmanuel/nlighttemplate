@@ -1,0 +1,14 @@
+# Normalize line endings: store text as LF in the repo, check out native per-OS.
+# This silences the "LF will be replaced by CRLF" warnings and keeps CI (Linux) consistent.
+* text=auto
+
+# Visual Studio solution files are conventionally CRLF.
+*.sln text eol=crlf
+
+# Treat common binary assets as binary (never normalized/diffed as text).
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.snk binary
+*.nupkg binary

@@ -1,5 +1,9 @@
 # NLightTemplate
 
+[![CI](https://github.com/kylepmanuel/nlighttemplate/actions/workflows/ci.yml/badge.svg)](https://github.com/kylepmanuel/nlighttemplate/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/NLightTemplate.svg)](https://www.nuget.org/packages/NLightTemplate)
+[![Downloads](https://img.shields.io/nuget/dt/NLightTemplate.svg)](https://www.nuget.org/packages/NLightTemplate)
+
 NLightTemplate is a lightweight .NET string template renderer. 
 
 This was born out of a recurring need (and subsequent fractured code bases) for server-side rendered, user-defined templates.  Our research and testing of the available template engines failed to find one that was lightweight and provided the functionality we required. We rolled our own and this is the result of internal iterations on the concept.  

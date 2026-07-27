@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Keep NuGet package references (xunit, Test.Sdk, MinVer, etc.) up to date.
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Keep the GitHub Actions used in the workflows below up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

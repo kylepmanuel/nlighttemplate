@@ -3,25 +3,47 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.0.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Authors>Kyle Manuel</Authors>
-    <Company>Antares, LLC</Company>
+    <Company>Kyle Manuel</Company>
+    <Description>NLightTemplate is a lightweight string template renderer with a simple syntax similar to C# 6 interpolation.</Description>
+    <Copyright>© 2017 Kyle Manuel</Copyright>
+    <PackageTags>template email stringtemplate</PackageTags>
     <PackageProjectUrl>https://github.com/kylepmanuel/nlighttemplate</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>template email stringtemplate</PackageTags>
-    <Description>NLightTemplate is a lightweight string template renderer with a simple syntax similar to C# 6 interpolation.</Description>
-    <Copyright>© 2017 Antares, LLC</Copyright>
-    <IncludeDocumentationProjectOutputGroup>True</IncludeDocumentationProjectOutputGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/kylepmanuel/nlighttemplate</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
+  <!-- Tag-based versioning (MinVer): the package version is derived from the latest git tag
+       (e.g. tag `v2.1.0` produces package 2.1.0). Untagged builds are pre-release. -->
   <PropertyGroup>
-    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\NLightTemplate.xml</DocumentationFile>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>2.0</MinVerMinimumMajorMinor>
+  </PropertyGroup>
+
+  <!-- Reproducible builds and better debugging: deterministic output, SourceLink, and a snupkg symbol package. -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Fails the build on an accidental breaking API change against a published baseline.
+         TODO: Set this once 2.0.0 is on NuGet:
+         <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion> -->
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="MinVer" Version="5.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship the README so it renders on the NuGet.org package page. -->
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
