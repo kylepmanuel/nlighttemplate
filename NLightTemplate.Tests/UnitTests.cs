@@ -3,22 +3,30 @@ using NLightTemplate.Tests.Generators;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Dynamic;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace NLightTemplate.Tests
 {
     public class UnitTests
     {
+        // The advanced-template fixtures hardcode CRLF line endings and en-US date/number formatting.
+        // Normalize both sides so comparisons are robust to the checkout line endings and to ICU's
+        // narrow (U+202F) / no-break (U+00A0) space before AM/PM, so the tests pass on Windows, Linux, and macOS.
+        private static string Normalize(string value) =>
+            value?.Replace("\r\n", "\n").Replace(" ", " ").Replace(" ", " ");
+
         [Theory]
         [ClassData(typeof(DefaultCustomerGenerator))]
         public void EnsureDefaultConfigurationRenders(object input, string template, string expected, bool isDynamic)
         {
-            Assert.Equal(expected, StringTemplate.Render(template, input));
+            Assert.Equal(Normalize(expected), Normalize(StringTemplate.Render(template, input)));
             if (isDynamic)
             {
                 var dyn = JsonConvert.DeserializeObject<Dictionary<string, object>>(JsonConvert.SerializeObject(input));
                 var rendered = StringTemplate.Render(template, dyn);
-                Assert.Equal(expected, rendered);
+                Assert.Equal(Normalize(expected), Normalize(rendered));
             }
         }
 
@@ -26,9 +34,9 @@ namespace NLightTemplate.Tests
         [ClassData(typeof(ConfiguredCustomerGenerator))]
         public void EnsureFluentConfigurationRenders(object input, StringTemplateConfiguration cfg, string template, string expected)
         {
-            Assert.Equal(expected, StringTemplate.Render(template, input, cfg));
+            Assert.Equal(Normalize(expected), Normalize(StringTemplate.Render(template, input, cfg)));
             dynamic dyn = input.ToDynamic();
-            Assert.Equal(expected, StringTemplate.Render(template, dyn, cfg));
+            Assert.Equal(Normalize(expected), Normalize(StringTemplate.Render(template, dyn, cfg)));
         }
 
         [Theory]
@@ -108,6 +116,19 @@ namespace NLightTemplate.Tests
                 expando.Add(property.Name, property.GetValue(value));
 
             return expando as ExpandoObject;
+        }
+    }
+
+    internal static class TestModuleInitializer
+    {
+        // Pin the test run to en-US so the fixtures' hardcoded en-US dates/numbers render identically across
+        // CI runners (Linux/macOS otherwise default to an invariant / C.UTF-8 culture).
+        [ModuleInitializer]
+        internal static void Init()
+        {
+            var enUs = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo.DefaultThreadCurrentCulture = enUs;
+            CultureInfo.DefaultThreadCurrentUICulture = enUs;
         }
     }
 }
