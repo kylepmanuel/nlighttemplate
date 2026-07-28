@@ -175,10 +175,34 @@ namespace NLightTemplate
                             ),
                         RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline)
                     .Matches(text).Cast<Match>().Aggregate(c, (prev, match) => prev.Replace(match.Captures[0].Value,
-                        string.Join("", enumerable.Cast<object>().Select(item => ReplaceText(match.Groups[1].Value, BuildPropertyDictionary(item), cfg)))))
+                        string.Join("", WithLoopMetadata(enumerable).Select(scope => ReplaceText(match.Groups[1].Value, scope, cfg)))))
                 :
                 ReplaceToken(c, k.Key, k.Value, cfg, replacements)
             );
+
+        /// <summary>
+        /// Builds the per-item property dictionaries for a <c>foreach</c> body, adding loop metadata:
+        /// <c>index</c> (0-based), <c>first</c>/<c>last</c> (bool), and <c>count</c>. A property already on the item
+        /// with one of those names is left untouched (the item's own value wins).
+        /// </summary>
+        private static IEnumerable<Dictionary<string, object>> WithLoopMetadata(IEnumerable enumerable)
+        {
+            var items = enumerable.Cast<object>().ToList();
+            for (var i = 0; i < items.Count; i++)
+            {
+                var scope = BuildPropertyDictionary(items[i]);
+                AddIfAbsent(scope, "index", i);
+                AddIfAbsent(scope, "first", i == 0);
+                AddIfAbsent(scope, "last", i == items.Count - 1);
+                AddIfAbsent(scope, "count", items.Count);
+                yield return scope;
+            }
+        }
+
+        private static void AddIfAbsent(Dictionary<string, object> dict, string key, object value)
+        {
+            if (!dict.ContainsKey(key)) dict[key] = value;
+        }
 
         internal static string ReplaceToken(string original, string key, object value, StringTemplateConfiguration cfg, Dictionary<string, object> replacements)
         {

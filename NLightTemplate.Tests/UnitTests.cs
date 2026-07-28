@@ -125,6 +125,45 @@ namespace NLightTemplate.Tests
             var model = new ShadowDerived();
             Assert.Equal("derived", StringTemplate.Render("{Label}", model));
         }
+
+        [Fact]
+        public void ForeachExposesLoopMetadata()
+        {
+            var data = new { Items = new[] { new { Name = "A" }, new { Name = "B" }, new { Name = "C" } } };
+            Assert.Equal("[0/3 True False A][1/3 False False B][2/3 False True C]",
+                StringTemplate.Render("{foreach Items}[{index}/{count} {first} {last} {Name}]{/foreach Items}", data));
+        }
+
+        [Fact]
+        public void LoopMetadataComposesWithIfForSeparators()
+        {
+            var data = new { Items = new[] { new { Name = "A" }, new { Name = "B" }, new { Name = "C" } } };
+            Assert.Equal("A, B, C",
+                StringTemplate.Render("{foreach Items}{Name}{if last}{else}, {/if last}{/foreach Items}", data));
+        }
+
+        [Fact]
+        public void NestedForeachHaveIndependentLoopMetadata()
+        {
+            var data = new
+            {
+                Outer = new[]
+                {
+                    new { Inner = new[] { new { }, new { } } },
+                    new { Inner = new[] { new { }, new { } } }
+                }
+            };
+            Assert.Equal("0:01;1:01;",
+                StringTemplate.Render("{foreach Outer}{index}:{foreach Inner}{index}{/foreach Inner};{/foreach Outer}", data));
+        }
+
+        [Fact]
+        public void ItemPropertyWinsOverLoopMetadata()
+        {
+            // An item that already has a 'count' property keeps its own value; loop metadata does not clobber it.
+            var data = new { Items = new[] { new { count = 99 } } };
+            Assert.Equal("99", StringTemplate.Render("{foreach Items}{count}{/foreach Items}", data));
+        }
     }
 
     public class BaseEntity

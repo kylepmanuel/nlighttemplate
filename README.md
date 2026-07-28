@@ -12,7 +12,7 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
 
  * Lightweight, no external dependencies
  * Reflection-based POCO key:value replacement
- * Nested enumeration (works with any `IEnumerable`, including custom implementations)
+ * Nested enumeration (works with any `IEnumerable`, including custom implementations) with loop metadata (`{index}`, `{first}`, `{last}`, `{count}`)
  * Dot notation property accessors for reference types
  * Conditionals: boolean `{if}`/`{else}`, comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`), property-to-property (`@`) and enum-aware comparisons
  * Usable as a static class or via an injectable `ITemplateRenderer`
@@ -166,6 +166,14 @@ Console.WriteLine(s == t); // outputs True
     */
 ```
 
+##### Loop metadata
+Inside a ```foreach``` block these values are available for the current item: ```{index}``` (0-based position), ```{first}``` and ```{last}``` (booleans), and ```{count}``` (total items). Because ```{first}``` and ```{last}``` are booleans, they combine with ```{if}``` for things like separators:
+```cs
+StringTemplate.Render("{foreach Orders}{Id}{if last}{else}, {/if last}{/foreach Orders}", customer);
+// "123, 124"
+```
+If the item already has a property named ```index```, ```first```, ```last```, or ```count```, that property's value is used instead (your data wins).
+
 #### Dot Notation
 Any reference properties will have their properties available using dot notation.
 The above example shows ```{Product.Name}``` writing out the ```Name``` property on the ```Product``` property of the ```OrderDetail``` instance.
@@ -226,32 +234,25 @@ public class GreetingService
 A complete, runnable example lives in the `Sample.DependencyInjection` project (`dotnet run --project Sample.DependencyInjection`).
 
 #### Advanced Template
+This one combines dot notation, inherited properties, enum and property-to-property comparisons, `{if}`/`{else}`, nested `{foreach}`, loop metadata, and format specifiers:
 ```cs
-string template = @"
-				Thank you {FullName} for your recent order(s):
-                email: {emailAddress}
-                something unknown: {dunno}
+string template =
+@"Hi {FullName}, thanks for your order!
 
-                {foreach Orders}
-                Order {Id} placed at {Placed} and Shipped {Shipped}
-                QTY	Product		    Price       SubTotal
-                {foreach Details}
-                {Quantity}	{Product.Name}	    {UnitPrice}     	{SubTotal}
-                {/foreach Details}
-					        Total:  {SubTotal}
-                {/foreach Orders}
-                {foreach Orders}
-                This is the 2nd list for Order: {Id}
-                QTY	Product		            Price       SubTotal
-                {foreach Details}
-                {Quantity}	{Product}	    {UnitPrice}     	{SubTotal}
-                {/foreach Details}
-					                Total: 	{SubTotal}
-                {/foreach Orders}";
-                
-var extras = new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } };
-Console.WriteLine(StringTemplate.Render(template, BuildDemoCustomer(), extras));
+Account #{Id}, member since {CreatedUtc:yyyy-MM-dd}. Shipping to {ShippingAddress.City}, {ShippingAddress.Country}.
+{if Level == Gold}Gold member: express shipping is free.{else}Upgrade to Gold for free express shipping.{/if Level}
+{if LoyaltyPoints >= @RewardThreshold}You have {LoyaltyPoints} points, enough to redeem a reward!{else}{LoyaltyPoints} of {RewardThreshold} points to your next reward.{/if LoyaltyPoints}
+
+You have {OrderCount} recent order(s):
+{foreach Orders}  [{index}] Order #{Id} placed {Placed:yyyy-MM-dd}{if first} (latest){/if first} - {if Shipped}shipped{else}processing{/if Shipped}
+{foreach Lines}      {Quantity} x {Product} @ {UnitPrice:C} = {Subtotal:C}
+{/foreach Lines}      Order total: {Total:C} {if Total >= 50}(free shipping){else}(+ $5.00 shipping){/if Total}
+{/foreach Orders}";
+
+var extras = new Dictionary<string, object> { { "supportEmail", "help@example.com" } };
+Console.WriteLine(StringTemplate.Render(template, customer, extras));
 ```
+The full runnable version (model, data, and a custom-token example) is in the [`Sample`](Sample/Program.cs) project: ```dotnet run --project Sample```.
 ## Performance
 Render time across published versions (lower is better). Absolute numbers reflect the machine that produced them, so read the version-over-version comparison as the signal. See the [full report](docs/benchmarks/benchmarks.md).
 
@@ -279,7 +280,7 @@ Benchmark the library against your own template and data with the [benchmark pro
 - [x] Benchmarking report: publish a comparison of rendering performance from v1.1.0 through v2.x.x+ (expected 2.1)
 
 **Template authoring**
-- [ ] Loop metadata inside `foreach`: expose values such as `{index}`, `{first}`, `{last}`, and `{count}` within a loop (expected 2.1)
+- [x] Loop metadata inside `foreach`: expose values such as `{index}`, `{first}`, `{last}`, and `{count}` within a loop (expected 2.1)
 - [ ] `{else if}` chains: allow chained else-if conditions inside an `if` block (expected 2.2)
 - [ ] Negation: support negating a condition, for example `{if !IsActive}` (expected 2.2)
 - [ ] Fallback null coalesce: provide an inline fallback for null or missing values, for example `{Prop ?? "N/A"}` (expected 2.3)
