@@ -6,6 +6,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # NLightTemplate.Benchmarks.Versions pins the OLDEST compared version (1.1.0) on purpose; bumping it to a
+      # newer release would trip NuGet's downgrade guard (NU1605) when BenchmarkDotNet swaps in older versions.
+      - dependency-name: "NLightTemplate"
     groups:
       # Batch all minor/patch bumps into a single PR; majors still come one-per-PR so they can be reviewed on their own.
       nuget-minor-and-patch:

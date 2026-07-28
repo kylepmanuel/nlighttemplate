@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,11 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="[8.*,9)" />
     <!-- Baseline reference so the benchmark compiles; BenchmarkDotNet swaps this for each version under
-         test at run time (see Program.cs / NLT_VERSIONS). Keep this at the OLDEST version being compared so
-         every swap is an upgrade-or-equal: a downgrade trips NuGet's NU1605 and the version fails to build. -->
-    <PackageReference Include="NLightTemplate" Version="1.1.0" />
+         test at run time (see Program.cs / NLT_VERSIONS). [1.1.0] is an exact pin at the OLDEST version being
+         compared so it never floats; keep it as the oldest, since a downgrade would trip NuGet's NU1605. -->
+    <PackageReference Include="NLightTemplate" Version="[1.1.0]" />
   </ItemGroup>
 
 </Project>
