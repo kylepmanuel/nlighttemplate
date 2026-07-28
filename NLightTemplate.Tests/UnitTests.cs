@@ -94,6 +94,97 @@ namespace NLightTemplate.Tests
             var renderer = new TemplateRenderer(new CustomConfiguration());
             Assert.Equal("Hello John Doe!", renderer.Render("Hello <<FullName>>!", Customer.GenerateDemo()));
         }
+
+        [Fact]
+        public void FormatSpecifiersWorkWithRegexMetacharacterTokens()
+        {
+            // '[' and ']' are regex metacharacters; the format/padding matcher must escape the tokens.
+            var cfg = new FluentStringTemplateConfiguration().OpenToken("[[").CloseToken("]]").ExposeConfiguration();
+            Assert.Equal("Total: 12.50", StringTemplate.Render("Total: [[Amount:0.00]]", new { Amount = 12.5 }, cfg));
+        }
+
+        [Fact]
+        public void FormatSpecifiersEscapeDottedKeys()
+        {
+            // The '.' in a dotted key must be matched literally, not as the regex "any character".
+            Assert.Equal("9.50", StringTemplate.Render("{Product.Price:0.00}", new { Product = new { Price = 9.5 } }));
+        }
+
+        [Fact]
+        public void InheritedPropertiesAreRendered()
+        {
+            // Id and Kind are declared on the base class; they must still be reflected and rendered.
+            var model = new DerivedEntity { Id = 7, Name = "Widget" };
+            Assert.Equal("7 Widget base", StringTemplate.Render("{Id} {Name} {Kind}", model));
+        }
+
+        [Fact]
+        public void MostDerivedPropertyWinsWhenHidden()
+        {
+            // A 'new'-hidden property must not cause a duplicate-key failure; the derived declaration wins.
+            var model = new ShadowDerived();
+            Assert.Equal("derived", StringTemplate.Render("{Label}", model));
+        }
+
+        [Fact]
+        public void ForeachExposesLoopMetadata()
+        {
+            var data = new { Items = new[] { new { Name = "A" }, new { Name = "B" }, new { Name = "C" } } };
+            Assert.Equal("[0/3 True False A][1/3 False False B][2/3 False True C]",
+                StringTemplate.Render("{foreach Items}[{index}/{count} {first} {last} {Name}]{/foreach Items}", data));
+        }
+
+        [Fact]
+        public void LoopMetadataComposesWithIfForSeparators()
+        {
+            var data = new { Items = new[] { new { Name = "A" }, new { Name = "B" }, new { Name = "C" } } };
+            Assert.Equal("A, B, C",
+                StringTemplate.Render("{foreach Items}{Name}{if last}{else}, {/if last}{/foreach Items}", data));
+        }
+
+        [Fact]
+        public void NestedForeachHaveIndependentLoopMetadata()
+        {
+            var data = new
+            {
+                Outer = new[]
+                {
+                    new { Inner = new[] { new { }, new { } } },
+                    new { Inner = new[] { new { }, new { } } }
+                }
+            };
+            Assert.Equal("0:01;1:01;",
+                StringTemplate.Render("{foreach Outer}{index}:{foreach Inner}{index}{/foreach Inner};{/foreach Outer}", data));
+        }
+
+        [Fact]
+        public void ItemPropertyWinsOverLoopMetadata()
+        {
+            // An item that already has a 'count' property keeps its own value; loop metadata does not clobber it.
+            var data = new { Items = new[] { new { count = 99 } } };
+            Assert.Equal("99", StringTemplate.Render("{foreach Items}{count}{/foreach Items}", data));
+        }
+    }
+
+    public class BaseEntity
+    {
+        public int Id { get; set; }
+        public string Kind => "base";
+    }
+
+    public class DerivedEntity : BaseEntity
+    {
+        public string Name { get; set; }
+    }
+
+    public class ShadowBase
+    {
+        public string Label { get; set; } = "base";
+    }
+
+    public class ShadowDerived : ShadowBase
+    {
+        public new string Label { get; set; } = "derived";
     }
 
     /// <summary>A bespoke <see cref="IStringTemplateConfiguration"/> that isn't a <see cref="StringTemplateConfiguration"/>.</summary>

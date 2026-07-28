@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- BenchmarkDotNet requires an optimized (Release) build to run. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="[8.*,9)" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NLightTemplate\NLightTemplate.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The default sample travels inside the assembly (robust in BenchmarkDotNet's spawned processes);
+         the same files also live on disk under samples/ as a starting point for your own runs. -->
+    <EmbeddedResource Include="samples\customer.template.txt" />
+    <EmbeddedResource Include="samples\customer.data.json" />
+  </ItemGroup>
+
+</Project>

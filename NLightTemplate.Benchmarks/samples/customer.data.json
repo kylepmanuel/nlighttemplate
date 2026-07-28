@@ -1,0 +1,24 @@
+{
+  "FullName": "John Doe",
+  "IsPreferred": true,
+  "Orders": [
+    {
+      "Id": 123,
+      "Placed": "2017-09-19T16:47:40",
+      "Total": 24.25,
+      "Lines": [
+        { "Quantity": 1, "Product": "Blue Shirt", "UnitPrice": 12.35, "Subtotal": 12.35 },
+        { "Quantity": 2, "Product": "White Socks", "UnitPrice": 5.95, "Subtotal": 11.90 }
+      ]
+    },
+    {
+      "Id": 124,
+      "Placed": "2017-09-22T10:15:00",
+      "Total": 107.79,
+      "Lines": [
+        { "Quantity": 1, "Product": "Red Shoes", "UnitPrice": 59.99, "Subtotal": 59.99 },
+        { "Quantity": 4, "Product": "White Shirt", "UnitPrice": 11.95, "Subtotal": 47.80 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+Hello {FullName}!
+{if IsPreferred}Preferred customer perks apply.{else}Welcome!{/if IsPreferred}
+{foreach Orders}
+Order {Id} placed {Placed:yyyy-MM-dd} (total {Total:0.00}):
+{foreach Lines}  {Quantity} x {Product} @ {UnitPrice:0.00} = {Subtotal:0.00}
+{/foreach Lines}{/foreach Orders}
