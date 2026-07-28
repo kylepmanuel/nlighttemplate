@@ -1,6 +1,7 @@
-﻿using Microsoft.CSharp.RuntimeBinder;
+using Microsoft.CSharp.RuntimeBinder;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Globalization;
@@ -83,7 +84,7 @@ namespace NLightTemplate
             string prefix(string p) => string.IsNullOrEmpty(p) ? "" : $"{p}.";
 
             IEnumerable<KeyValuePair<string, object>> CollectProperties(string pre, object o) =>
-                o.GetType().GetTypeInfo().DeclaredProperties.Where(p => p.GetMethod?.IsPublic ?? false)
+                PublicProperties(o.GetType())
                     .SelectMany(prop => new[] { new KeyValuePair<string, object>($"{prefix(pre)}{prop.Name}", prop.GetValue(o)) }
                     .Concat((prop.PropertyType.GetTypeInfo().IsClass && prop.PropertyType != typeof(string) && !typeof(IEnumerable).GetTypeInfo().IsAssignableFrom(prop.PropertyType.GetTypeInfo())) ?
                         CollectProperties($"{prefix(pre)}{prop.Name}", prop.GetValue(o))
@@ -91,6 +92,20 @@ namespace NLightTemplate
 
             return CollectProperties(string.Empty, obj).ToDictionary(x => x.Key, x => x.Value);
         }
+
+        /// <summary>
+        /// Returns the public-getter properties of a type, including those inherited from base classes. When a
+        /// property is hidden (<c>new</c>) or overridden, the most-derived declaration wins, so each name appears once.
+        /// </summary>
+        private static IEnumerable<PropertyInfo> PublicProperties(Type type)
+        {
+            var seen = new HashSet<string>();
+            for (var current = type; current != null && current != typeof(object); current = current.GetTypeInfo().BaseType)
+                foreach (var property in current.GetTypeInfo().DeclaredProperties)
+                    if ((property.GetMethod?.IsPublic ?? false) && seen.Add(property.Name))
+                        yield return property;
+        }
+
         /// <summary>
         /// Builds a property dictionary of key:value from the object instance
         /// </summary>
@@ -153,13 +168,13 @@ namespace NLightTemplate
         internal static string ReplaceText(string text, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) =>
             replacements.ToList().OrderBy((kvp) => (kvp.Value is IEnumerable && kvp.Value.GetType() != typeof(string)) ? 1 : 2).Aggregate(text, (c, k) =>
                 (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") >= 0 && c.IndexOf($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") > 0) ?
-                    new Regex(string.Format(
+                    GetRegex(string.Format(
                             @"{0}(?<inner>(?>{0}(?<LEVEL>)|{1}(?<-LEVEL>)|(?!{0}|{1}).)+(?(LEVEL)(?!))){1}",
-                            string.Join("", $@"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{(int)ch:X4}")),
-                            string.Join("", $@"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}".ToCharArray().Select(ch => $"\\u{(int)ch:X4}"))
+                            Escape($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}"),
+                            Escape($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}")
                             ),
                         RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline)
-                    .Matches(text).Cast<Match>().Aggregate(c, (prev, match) => prev.Replace(match.Captures[0].Value, 
+                    .Matches(text).Cast<Match>().Aggregate(c, (prev, match) => prev.Replace(match.Captures[0].Value,
                         string.Join("", enumerable.Cast<object>().Select(item => ReplaceText(match.Groups[1].Value, BuildPropertyDictionary(item), cfg)))))
                 :
                 ReplaceToken(c, k.Key, k.Value, cfg, replacements)
@@ -175,9 +190,14 @@ namespace NLightTemplate
                 );
 
             original = ReplaceConditionals(original, key, value, cfg, replacements);
+            original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty);
 
-            return Regex.Matches((original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty))
-                    , $@"{cfg.OpenToken}(?<key>{key})(,(?<pad>-*?\d+))*?(:(?<fmt>[^}}]+))*?{cfg.CloseToken}")
+            // Escape the tokens and key (they can contain regex metacharacters, and dotted keys contain '.'),
+            // and match the format up to the close token rather than a hard-coded '}'.
+            var closeToken = Regex.Escape(cfg.CloseToken);
+            var formatPattern = $@"{Regex.Escape(cfg.OpenToken)}(?<key>{Regex.Escape(key)})(,(?<pad>-*?\d+))*?(:(?<fmt>(?:(?!{closeToken}).)+))*?{closeToken}";
+
+            return GetRegex(formatPattern).Matches(original)
                 .Cast<Match>()
                 .Aggregate(original, (s, match) =>
             {
@@ -195,6 +215,17 @@ namespace NLightTemplate
         /// regex metacharacters can be embedded safely in a pattern.
         /// </summary>
         private static string Escape(string token) => string.Join("", token.ToCharArray().Select(ch => $"\\u{(int)ch:X4}"));
+
+        /// <summary>
+        /// Cache of <see cref="Regex"/> instances keyed by pattern and options. The relatively expensive pattern
+        /// parsing happens once per distinct pattern and is reused across renders.
+        /// </summary>
+        private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options), Regex> _regexCache = new ConcurrentDictionary<(string Pattern, RegexOptions Options), Regex>();
+
+        /// <summary>
+        /// Returns a cached <see cref="Regex"/> for the pattern/options, building it on first use.
+        /// </summary>
+        private static Regex GetRegex(string pattern, RegexOptions options = RegexOptions.None) => _regexCache.GetOrAdd((pattern, options), key => new Regex(key.Pattern, key.Options));
 
         /// <summary>
         /// Resolves <c>{if Key}</c>/<c>{if Key op value}</c> conditional blocks (with optional <c>{else}</c>) for the supplied key.
@@ -224,7 +255,7 @@ namespace NLightTemplate
             var openCap = $@"{openPrefix}{boundary}(?<cond>(?:(?!{closeTok}).)*){closeTok}";
             var openNc = $@"{openPrefix}{boundary}(?:(?!{closeTok}).)*{closeTok}";
 
-            var rx = new Regex(
+            var rx = GetRegex(
                 $@"{openCap}(?<inner>(?>{openNc}(?<LEVEL>)|{closeTag}(?<-LEVEL>)|(?!{openNc}|{closeTag}).)+(?(LEVEL)(?!))){closeTag}",
                 RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline);
 
@@ -245,7 +276,7 @@ namespace NLightTemplate
         {
             truePart = inner;
             elsePart = string.Empty;
-            var rx = new Regex($@"(?<ifc>{Escape($"{cfg.OpenToken}/{cfg.IfToken} ")})|(?<ifo>{Escape($"{cfg.OpenToken}{cfg.IfToken} ")})|(?<els>{Escape($"{cfg.OpenToken}{cfg.ElseToken}{cfg.CloseToken}")})");
+            var rx = GetRegex($@"(?<ifc>{Escape($"{cfg.OpenToken}/{cfg.IfToken} ")})|(?<ifo>{Escape($"{cfg.OpenToken}{cfg.IfToken} ")})|(?<els>{Escape($"{cfg.OpenToken}{cfg.ElseToken}{cfg.CloseToken}")})");
             var depth = 0;
             foreach (Match m in rx.Matches(inner))
             {

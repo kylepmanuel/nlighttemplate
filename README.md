@@ -270,13 +270,13 @@ Benchmark the library against your own template and data with the [benchmark pro
 #### Planned
 
 **Correctness and robustness**
-- [ ] Inherited properties: flatten properties inherited from base classes, not just those declared on the exact type (expected 2.1)
-- [ ] Regex escaping: escape configured tokens in the format/padding matcher so custom tokens containing regex metacharacters work (expected 2.1)
+- [x] Inherited properties: flatten properties inherited from base classes, not just those declared on the exact type (expected 2.1)
+- [x] Regex escaping: escape configured tokens in the format/padding matcher so custom tokens containing regex metacharacters work (expected 2.1)
 
 **Performance**
-- [ ] Regex reuse: reuse compiled `Regex` instances across renders rather than rebuilding them each call (expected 2.1)
+- [x] Regex reuse: reuse compiled `Regex` instances across renders rather than rebuilding them each call (expected 2.1)
 - [ ] Compiled/cached property accessors: cache compiled per-type accessors so repeated renders skip the reflection cost (expected 2.2)
-- [ ] Benchmarking report: publish a comparison of rendering performance from v1.1.0 through v2.x.x+ (expected 2.1)
+- [x] Benchmarking report: publish a comparison of rendering performance from v1.1.0 through v2.x.x+ (expected 2.1)
 
 **Template authoring**
 - [ ] Loop metadata inside `foreach`: expose values such as `{index}`, `{first}`, `{last}`, and `{count}` within a loop (expected 2.1)

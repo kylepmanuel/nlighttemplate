@@ -94,6 +94,58 @@ namespace NLightTemplate.Tests
             var renderer = new TemplateRenderer(new CustomConfiguration());
             Assert.Equal("Hello John Doe!", renderer.Render("Hello <<FullName>>!", Customer.GenerateDemo()));
         }
+
+        [Fact]
+        public void FormatSpecifiersWorkWithRegexMetacharacterTokens()
+        {
+            // '[' and ']' are regex metacharacters; the format/padding matcher must escape the tokens.
+            var cfg = new FluentStringTemplateConfiguration().OpenToken("[[").CloseToken("]]").ExposeConfiguration();
+            Assert.Equal("Total: 12.50", StringTemplate.Render("Total: [[Amount:0.00]]", new { Amount = 12.5 }, cfg));
+        }
+
+        [Fact]
+        public void FormatSpecifiersEscapeDottedKeys()
+        {
+            // The '.' in a dotted key must be matched literally, not as the regex "any character".
+            Assert.Equal("9.50", StringTemplate.Render("{Product.Price:0.00}", new { Product = new { Price = 9.5 } }));
+        }
+
+        [Fact]
+        public void InheritedPropertiesAreRendered()
+        {
+            // Id and Kind are declared on the base class; they must still be reflected and rendered.
+            var model = new DerivedEntity { Id = 7, Name = "Widget" };
+            Assert.Equal("7 Widget base", StringTemplate.Render("{Id} {Name} {Kind}", model));
+        }
+
+        [Fact]
+        public void MostDerivedPropertyWinsWhenHidden()
+        {
+            // A 'new'-hidden property must not cause a duplicate-key failure; the derived declaration wins.
+            var model = new ShadowDerived();
+            Assert.Equal("derived", StringTemplate.Render("{Label}", model));
+        }
+    }
+
+    public class BaseEntity
+    {
+        public int Id { get; set; }
+        public string Kind => "base";
+    }
+
+    public class DerivedEntity : BaseEntity
+    {
+        public string Name { get; set; }
+    }
+
+    public class ShadowBase
+    {
+        public string Label { get; set; } = "base";
+    }
+
+    public class ShadowDerived : ShadowBase
+    {
+        public new string Label { get; set; } = "derived";
     }
 
     /// <summary>A bespoke <see cref="IStringTemplateConfiguration"/> that isn't a <see cref="StringTemplateConfiguration"/>.</summary>
