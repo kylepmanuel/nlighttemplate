@@ -32,6 +32,13 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
 
 Targets `netstandard2.0`, so it runs on .NET Framework 4.6.1+, .NET Core 2.0+, and all modern .NET (5/6/7/8+).
 
+## Should I update?
+
+NLightTemplate has been in production use for over 8 years with more than 19,000 downloads on NuGet. The 1.x line is stable and battle-tested.
+
+Update to 2.x if you want the newer features: dependency injection via `ITemplateRenderer`, `{else}` and comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`) in `{if}`, enum and property-to-property comparisons, and validated custom `IEnumerable` support. 2.x targets `netstandard2.0` (.NET Framework 4.6.1+, .NET Core 2.0+, and all modern .NET).
+
+If you don't need those, there is no pressure to move. The 1.x line targets `netstandard1.0` and .NET Framework 4.5, and will continue to be supported for the foreseeable future, so projects on older frameworks or ones that simply want to stay put can keep using it.
 
 ## Syntax
 The renderer uses token replacement with curly braces ```{``` and ```}``` surrounding the key by default.
@@ -245,6 +252,13 @@ string template = @"
 var extras = new Dictionary<string, object>() { { "emailAddress", "someone@home.com" } };
 Console.WriteLine(StringTemplate.Render(template, BuildDemoCustomer(), extras));
 ```
+## Performance
+Render time across published versions (lower is better). Absolute numbers reflect the machine that produced them, so read the version-over-version comparison as the signal. See the [full report](docs/benchmarks/benchmarks.md).
+
+![Render time by version](docs/benchmarks/benchmarks.svg)
+
+Benchmark the library against your own template and data with the [benchmark project](NLightTemplate.Benchmarks/README.md).
+
 ## Roadmap
 
 #### Released

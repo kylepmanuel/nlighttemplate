@@ -1,0 +1,59 @@
+name: Benchmarks
+
+# Regenerates the version-comparison report (docs/benchmarks/) on each release, or on demand.
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Compare every published stable version >= 1.1.0 (1.0.x lacks format support and is below the
+      # benchmark's baseline reference, which would trip NuGet's downgrade guard).
+      - name: Resolve versions to compare
+        id: versions
+        run: |
+          list=$(curl -s https://api.nuget.org/v3-flatcontainer/nlighttemplate/index.json \
+            | jq -r '.versions[]' \
+            | grep -v -- '-' \
+            | grep -v '^1\.0\.' \
+            | sort -V \
+            | paste -sd ',' -)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "Comparing: $list"
+
+      - name: Run version comparison
+        env:
+          NLT_VERSIONS: ${{ steps.versions.outputs.list }}
+          NLT_REPORT_DIR: docs/benchmarks
+        run: dotnet run -c Release --project NLightTemplate.Benchmarks.Versions -- --filter "*"
+
+      - name: Open PR with the updated report
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "docs: update version benchmark report"
+          branch: benchmarks/update-report
+          title: "Update version benchmark report"
+          body: |
+            Automated regeneration of the version-comparison benchmark report (`docs/benchmarks/`).
+            Numbers are from the GitHub runner, so read the version-over-version comparison as the signal.
+          add-paths: docs/benchmarks/*
