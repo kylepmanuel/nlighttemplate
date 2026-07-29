@@ -67,7 +67,10 @@ namespace NLightTemplate
                   CloseToken = cfg.CloseToken,
                   ForeachToken = cfg.ForeachToken,
                   IfToken = cfg.IfToken,
-                  ElseToken = cfg.ElseToken
+                  ElseToken = cfg.ElseToken,
+                  FormatProvider = cfg.FormatProvider,
+                  HtmlEncode = cfg.HtmlEncode,
+                  TrimBlockWhitespace = cfg.TrimBlockWhitespace
               };
     }
 }

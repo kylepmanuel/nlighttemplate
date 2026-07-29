@@ -7,6 +7,7 @@ using System.Dynamic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -200,6 +201,8 @@ namespace NLightTemplate
         /// <returns></returns>
         internal static string ReplaceText(string text, Dictionary<string, object> replacements, StringTemplateConfiguration cfg)
         {
+            if (cfg.TrimBlockWhitespace) text = TrimBlocks(text, cfg);
+
             var result =
             replacements.ToList().OrderBy((kvp) => (kvp.Value is IEnumerable && kvp.Value.GetType() != typeof(string)) ? 1 : 2).Aggregate(text, (c, k) =>
                 (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") >= 0 && c.IndexOf($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") > 0) ?
@@ -253,22 +256,15 @@ namespace NLightTemplate
             if (original.IndexOf($"{cfg.OpenToken}{key}", StringComparison.Ordinal) < 0)
                 return original;
 
-            var typeInfo = value?.GetType().GetTypeInfo();
-            var toStringMethod = (typeInfo?.IsEnum ?? false ? typeInfo?.BaseType.GetTypeInfo() : typeInfo)?
-                .GetDeclaredMethods("ToString")
-                .FirstOrDefault(p =>
-                    p.GetParameters().Select(q => q.ParameterType).SequenceEqual(new Type[] { typeof(string) })
-                );
-
             // Null-coalesce: {Key ?? fallback} renders the value, or the (optionally quoted) fallback when null.
             if (original.IndexOf("??", StringComparison.Ordinal) >= 0)
             {
                 var coalescePattern = $@"{Regex.Escape(cfg.OpenToken)}{Regex.Escape(key)}\s*\?\?\s*(?<fallback>(?:(?!{Regex.Escape(cfg.CloseToken)}).)+){Regex.Escape(cfg.CloseToken)}";
                 original = GetRegex(coalescePattern).Matches(original).Cast<Match>().Aggregate(original, (s, m) =>
-                    s.Replace(m.Value, value == null ? Unquote(m.Groups["fallback"].Value) : value.ToString()));
+                    s.Replace(m.Value, Encode(value == null ? Unquote(m.Groups["fallback"].Value) : FormatValue(value, string.Empty, cfg), cfg)));
             }
 
-            original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty);
+            original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", Encode(FormatValue(value, string.Empty, cfg), cfg));
 
             // Escape the tokens and key (they can contain regex metacharacters, and dotted keys contain '.'),
             // and match the format up to the close token rather than a hard-coded '}'.
@@ -279,13 +275,65 @@ namespace NLightTemplate
                 .Cast<Match>()
                 .Aggregate(original, (s, match) =>
             {
-                var v = toStringMethod == null ? value?.ToString() : toStringMethod.Invoke(value, new[] { match.Groups["fmt"]?.Value ?? string.Empty }) as string;
+                var v = FormatValue(value, match.Groups["fmt"]?.Value ?? string.Empty, cfg);
                 if (int.TryParse(match.Groups["pad"]?.Value ?? string.Empty, out int padding))
                 {
                     v = padding < 0 ? v.PadRight(Math.Abs(padding)) : v.PadLeft(Math.Abs(padding));
                 }
-                return s.Replace(match.Value, v);
+                return s.Replace(match.Value, Encode(v, cfg));
             });
+        }
+
+        /// <summary>
+        /// Renders a value for substitution: uses the format specifier and configured <see cref="IFormatProvider"/>
+        /// when the value is <see cref="IFormattable"/>, otherwise its plain <c>ToString()</c>.
+        /// </summary>
+        private static string FormatValue(object value, string format, StringTemplateConfiguration cfg)
+        {
+            if (value == null) return string.Empty;
+            if (value is IFormattable formattable && (!string.IsNullOrEmpty(format) || cfg.FormatProvider != null))
+                return formattable.ToString(string.IsNullOrEmpty(format) ? null : format, cfg.FormatProvider);
+            return value.ToString();
+        }
+
+        /// <summary>
+        /// HTML-encodes a substituted value when <see cref="StringTemplateConfiguration.HtmlEncode"/> is enabled.
+        /// </summary>
+        private static string Encode(string value, StringTemplateConfiguration cfg) =>
+            cfg.HtmlEncode ? WebUtility.HtmlEncode(value) : value;
+
+        /// <summary>
+        /// Trims horizontal whitespace before, and a single trailing newline after, each block tag, so control tags
+        /// sitting on their own line do not leave blank lines in the output.
+        /// </summary>
+        private static string TrimBlocks(string text, StringTemplateConfiguration cfg)
+        {
+            var tag = BlockTagPattern(cfg);
+            text = GetRegex($@"(?m)^[ \t]+(?={tag})").Replace(text, string.Empty);
+            text = GetRegex($@"({tag})[ \t]*\r?\n").Replace(text, "$1");
+            return text;
+        }
+
+        /// <summary>
+        /// A regex fragment matching any block control tag: <c>{foreach X}</c>/<c>{/foreach X}</c>,
+        /// <c>{if X}</c>/<c>{/if X}</c>, <c>{else if X}</c>, and <c>{else}</c> (using the configured tokens). The
+        /// required space after a keyword keeps a scalar like <c>{ifield}</c> from matching.
+        /// </summary>
+        private static string BlockTagPattern(StringTemplateConfiguration cfg)
+        {
+            var open = Regex.Escape(cfg.OpenToken);
+            var close = Regex.Escape(cfg.CloseToken);
+            var content = $@"(?:(?!{close}).)*{close}";
+            var f = Regex.Escape(cfg.ForeachToken);
+            var i = Regex.Escape(cfg.IfToken);
+            var e = Regex.Escape(cfg.ElseToken);
+            return "(?:" + string.Join("|", new[]
+            {
+                $@"{open}/?{f}\ {content}",
+                $@"{open}/?{i}\ {content}",
+                $@"{open}{e}\ {i}\ {content}",
+                $@"{open}{e}{close}"
+            }) + ")";
         }
 
         /// <summary>

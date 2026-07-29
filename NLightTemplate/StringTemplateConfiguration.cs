@@ -20,6 +20,12 @@ namespace NLightTemplate
         string IfToken { get; }
         /// <summary>The Else token (default "else")</summary>
         string ElseToken { get; }
+        /// <summary>Format provider for format specifiers (default null = current culture)</summary>
+        IFormatProvider FormatProvider { get; }
+        /// <summary>When true, HTML-encodes substituted values (default false)</summary>
+        bool HtmlEncode { get; }
+        /// <summary>When true, trims whitespace and newlines around block tags (default false)</summary>
+        bool TrimBlockWhitespace { get; }
     }
 
     /// <summary>
@@ -47,6 +53,22 @@ namespace NLightTemplate
         /// The Else token (default "else")
         /// </summary>
         public string ElseToken { get; set; } = "else";
+        /// <summary>
+        /// The <see cref="IFormatProvider"/> (for example a <see cref="System.Globalization.CultureInfo"/>) used for
+        /// format specifiers. Default null uses the current culture.
+        /// </summary>
+        public IFormatProvider FormatProvider { get; set; }
+        /// <summary>
+        /// When true, HTML-encodes the substituted values (not the template literals) for safe HTML/email output.
+        /// Default false.
+        /// </summary>
+        public bool HtmlEncode { get; set; }
+        /// <summary>
+        /// When true, trims horizontal whitespace before, and a single trailing newline after, each block tag
+        /// (<c>foreach</c>, <c>if</c>, <c>else</c>) so control tags on their own line do not leave blank lines.
+        /// Default false.
+        /// </summary>
+        public bool TrimBlockWhitespace { get; set; }
 
         /// <summary>
         /// Builds a <see cref="StringTemplateConfiguration"/> using the fluent interface. Convenient for
@@ -130,6 +152,38 @@ namespace NLightTemplate
         public FluentStringTemplateConfiguration ElseToken(string elseToken)
         {
             _cfg.ElseToken = elseToken;
+            return this;
+        }
+        /// <summary>
+        /// Sets the <see cref="StringTemplateConfiguration.FormatProvider"/> (for example a
+        /// <see cref="System.Globalization.CultureInfo"/>) used for format specifiers.
+        /// </summary>
+        /// <param name="formatProvider">The format provider</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration FormatProvider(IFormatProvider formatProvider)
+        {
+            _cfg.FormatProvider = formatProvider;
+            return this;
+        }
+        /// <summary>
+        /// Enables (or disables) HTML-encoding of substituted values (<see cref="StringTemplateConfiguration.HtmlEncode"/>).
+        /// </summary>
+        /// <param name="htmlEncode">Whether to HTML-encode values</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration HtmlEncode(bool htmlEncode = true)
+        {
+            _cfg.HtmlEncode = htmlEncode;
+            return this;
+        }
+        /// <summary>
+        /// Enables (or disables) trimming of whitespace and newlines around block tags
+        /// (<see cref="StringTemplateConfiguration.TrimBlockWhitespace"/>).
+        /// </summary>
+        /// <param name="trim">Whether to trim block-tag whitespace</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration TrimBlockWhitespace(bool trim = true)
+        {
+            _cfg.TrimBlockWhitespace = trim;
             return this;
         }
         /// <summary>
