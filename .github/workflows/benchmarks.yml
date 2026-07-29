@@ -18,12 +18,12 @@ jobs:
   version-benchmarks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
@@ -48,7 +48,7 @@ jobs:
         run: dotnet run -c Release --project NLightTemplate.Benchmarks.Versions -- --filter "*"
 
       - name: Open PR with the updated report
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           # On a `release` trigger the repo is checked out at the tag commit (detached HEAD), so the target
           # branch can't be inferred and must be given explicitly.
