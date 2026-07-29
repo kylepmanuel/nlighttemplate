@@ -50,6 +50,9 @@ jobs:
       - name: Open PR with the updated report
         uses: peter-evans/create-pull-request@v6
         with:
+          # On a `release` trigger the repo is checked out at the tag commit (detached HEAD), so the target
+          # branch can't be inferred and must be given explicitly.
+          base: master
           commit-message: "docs: update version benchmark report"
           branch: benchmarks/update-report
           title: "Update version benchmark report"
