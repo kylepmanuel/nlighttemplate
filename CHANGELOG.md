@@ -4,7 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - unreleased
+## [2.2.0] - unreleased
+
+### Added
+- `{else if}` chains and negation (`!`) in conditions: `{if A}...{else if B}...{else}...{/if A}` renders the first matching branch, and an `{else if ...}` can test any property. Prefix any condition with `!` to negate it, for example `{if !IsActive}`.
+- Inline null-coalesce fallback: `{Prop ?? "N/A"}` renders the value, or the (optionally quoted) fallback when the property is null or missing.
+
+### Changed
+- Property accessors are compiled (expression trees) and cached per type, so repeated renders of the same type skip the reflection walk.
+- Rendering memory stays bounded on long-running and free-form (`ExpandoObject`) workloads: per-key work is skipped for keys the template does not reference, so the internal regex cache is bounded by the template's tokens rather than the data's property names, and that cache is additionally hard-capped.
+
+### Fixed
+- A null reference-type property no longer throws while flattening (the flattener no longer recurses into null).
+- Deeply nested dot notation such as `{A.B.C}` now flattens to the correct key.
+
+## [2.1.0] - 2026-07-28
 
 ### Added
 - Loop metadata inside `foreach`: `{index}` (0-based), `{first}`, `{last}`, and `{count}`. Since `{first}` and `{last}` are booleans, they compose with `{if}` for things like separators. If an item already has a property with one of those names, the item's value is used.
@@ -32,5 +46,6 @@ Major modernization. **Breaking:** the library now targets `netstandard2.0`, so 
 - Retargeted the library to `netstandard2.0`; tests and samples target `net8.0`.
 - The static `StringTemplate` API is unchanged, so existing templates render the same.
 
+[2.2.0]: https://github.com/kylepmanuel/nlighttemplate/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/kylepmanuel/nlighttemplate/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/kylepmanuel/nlighttemplate/compare/v1.1.0...v2.0.0

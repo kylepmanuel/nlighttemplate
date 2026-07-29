@@ -14,7 +14,8 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
  * Reflection-based POCO key:value replacement
  * Nested enumeration (works with any `IEnumerable`, including custom implementations) with loop metadata (`{index}`, `{first}`, `{last}`, `{count}`)
  * Dot notation property accessors for reference types
- * Conditionals: boolean `{if}`/`{else}`, comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`), property-to-property (`@`) and enum-aware comparisons
+ * Conditionals: boolean `{if}`/`{else}`/`{else if}`, negation (`!`), comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`), property-to-property (`@`) and enum-aware comparisons
+ * Inline null-coalesce fallback (`{Prop ?? "N/A"}`)
  * Usable as a static class or via an injectable `ITemplateRenderer`
  * Familiar syntax (using default configuration)
 
@@ -204,7 +205,20 @@ StringTemplate.Render("{if Status == Active}on{/if Status}", account); // by nam
 StringTemplate.Render("{if Status == 1}on{/if Status}", account);      // by number -> "on"
 ```
 
+Prefix a condition with ```!``` to **negate** it, and chain alternatives with ```{else if ...}```:
+```cs
+StringTemplate.Render("{if !IsActive}inactive{/if IsActive}", account);
+StringTemplate.Render("{if Level == Gold}Gold{else if Level == Silver}Silver{else}Basic{/if Level}", account);
+```
+An ```{else if ...}``` may test any property, not just the one in the opening tag (the closing tag still names the opening property).
+
 `if` blocks may be nested and combine freely with `foreach`.
+
+#### Null coalesce
+Provide an inline fallback for a null or missing value with ```??```. The fallback is used when the property is null or absent; wrap it in quotes to include spaces:
+```cs
+StringTemplate.Render("Hello {Name ?? \"there\"}!", customer); // "Hello there!" when Name is null/missing
+```
 
 #### Dependency Injection
 In addition to the static ```StringTemplate``` class, an instance-based ```ITemplateRenderer``` / ```TemplateRenderer``` is provided for DI-first applications. It carries its own configuration and delegates to the same engine. **NLightTemplate takes no dependency on any DI container**, so you register it yourself:
@@ -234,20 +248,23 @@ public class GreetingService
 A complete, runnable example lives in the `Sample.DependencyInjection` project (`dotnet run --project Sample.DependencyInjection`).
 
 #### Advanced Template
-This one combines dot notation, inherited properties, enum and property-to-property comparisons, `{if}`/`{else}`, nested `{foreach}`, loop metadata, and format specifiers:
+This one combines dot notation, inherited properties, enum and property-to-property comparisons, `{if}`/`{else if}`/`{else}` with negation (`!`), null-coalesce (`??`), nested `{foreach}`, loop metadata, and format specifiers:
 ```cs
 string template =
 @"Hi {FullName}, thanks for your order!
 
 Account #{Id}, member since {CreatedUtc:yyyy-MM-dd}. Shipping to {ShippingAddress.City}, {ShippingAddress.Country}.
-{if Level == Gold}Gold member: express shipping is free.{else}Upgrade to Gold for free express shipping.{/if Level}
+{if Level == Gold}Gold member: express shipping is free.{else if Level == Standard}Standard member: free shipping on orders over $50.{else}Create an account to start earning rewards.{/if Level}
 {if LoyaltyPoints >= @RewardThreshold}You have {LoyaltyPoints} points, enough to redeem a reward!{else}{LoyaltyPoints} of {RewardThreshold} points to your next reward.{/if LoyaltyPoints}
 
 You have {OrderCount} recent order(s):
-{foreach Orders}  [{index}] Order #{Id} placed {Placed:yyyy-MM-dd}{if first} (latest){/if first} - {if Shipped}shipped{else}processing{/if Shipped}
+{foreach Orders}  [{index}] Order #{Id} placed {Placed:yyyy-MM-dd}{if first} (latest){/if first} - {if !Shipped}processing{else}shipped{/if Shipped}
+      Tracking: {TrackingNumber ?? ""pending""}
 {foreach Lines}      {Quantity} x {Product} @ {UnitPrice:C} = {Subtotal:C}
 {/foreach Lines}      Order total: {Total:C} {if Total >= 50}(free shipping){else}(+ $5.00 shipping){/if Total}
-{/foreach Orders}";
+{if last}      that's all {count} order(s).
+{/if last}{/foreach Orders}
+Questions? Email {supportEmail}.";
 
 var extras = new Dictionary<string, object> { { "supportEmail", "help@example.com" } };
 Console.WriteLine(StringTemplate.Render(template, customer, extras));
@@ -276,14 +293,14 @@ Benchmark the library against your own template and data with the [benchmark pro
 
 **Performance**
 - [x] Regex reuse: reuse compiled `Regex` instances across renders rather than rebuilding them each call (released in 2.1)
-- [ ] Compiled/cached property accessors: cache compiled per-type accessors so repeated renders skip the reflection cost (expected 2.2)
+- [x] Compiled/cached property accessors: cache compiled per-type accessors so repeated renders skip the reflection cost (released in 2.2)
 - [x] Benchmarking report: publish a comparison of rendering performance from v1.1.0 through v2.x.x+ (released in 2.1)
 
 **Template authoring**
 - [x] Loop metadata inside `foreach`: expose values such as `{index}`, `{first}`, `{last}`, and `{count}` within a loop (released in 2.1)
-- [ ] `{else if}` chains: allow chained else-if conditions inside an `if` block (expected 2.2)
-- [ ] Negation: support negating a condition, for example `{if !IsActive}` (expected 2.2)
-- [ ] Fallback null coalesce: provide an inline fallback for null or missing values, for example `{Prop ?? "N/A"}` (expected 2.3)
+- [x] `{else if}` chains: allow chained else-if conditions inside an `if` block (released in 2.2)
+- [x] Negation: support negating a condition, for example `{if !IsActive}` (released in 2.2)
+- [x] Fallback null coalesce: provide an inline fallback for null or missing values, for example `{Prop ?? "N/A"}` (released in 2.2)
 
 **Output and formatting**
 - [ ] HTML encoding option: optionally HTML-encode substituted values for safe server-side HTML/email rendering (expected 2.3)
