@@ -164,6 +164,71 @@ namespace NLightTemplate.Tests
             var data = new { Items = new[] { new { count = 99 } } };
             Assert.Equal("99", StringTemplate.Render("{foreach Items}{count}{/foreach Items}", data));
         }
+
+        [Fact]
+        public void NegationInvertsBooleanCondition()
+        {
+            Assert.Equal("no", StringTemplate.Render("{if !MyBool}no{else}yes{/if MyBool}", new BooleanClass(false)));
+            Assert.Equal("yes", StringTemplate.Render("{if !MyBool}no{else}yes{/if MyBool}", new BooleanClass(true)));
+        }
+
+        [Fact]
+        public void ElseIfChainSelectsFirstMatch()
+        {
+            var t = "{if Status == None}n{else if Status == Active}a{else if Status == Disabled}d{else}?{/if Status}";
+            Assert.Equal("n", StringTemplate.Render(t, new EnumConditionClass { Status = Statuses.None }));
+            Assert.Equal("a", StringTemplate.Render(t, new EnumConditionClass { Status = Statuses.Active }));
+            Assert.Equal("d", StringTemplate.Render(t, new EnumConditionClass { Status = Statuses.Disabled }));
+        }
+
+        [Fact]
+        public void ElseIfCanReferenceADifferentKey()
+        {
+            var t = "{if Age >= 65}senior{else if Status == Active}active{else}other{/if Age}";
+            Assert.Equal("senior", StringTemplate.Render(t, new ConditionClass { Age = 70, Status = "Active" }));
+            Assert.Equal("active", StringTemplate.Render(t, new ConditionClass { Age = 30, Status = "Active" }));
+            Assert.Equal("other", StringTemplate.Render(t, new ConditionClass { Age = 30, Status = "Inactive" }));
+        }
+
+        [Fact]
+        public void NullCoalesceUsesFallbackWhenNull()
+        {
+            Assert.Equal("John", StringTemplate.Render("{Name ?? \"N/A\"}", new { Name = "John" }));
+            Assert.Equal("N/A", StringTemplate.Render("{Name ?? \"N/A\"}", new { Name = (string)null }));
+        }
+
+        [Fact]
+        public void NullCoalesceUsesFallbackWhenKeyMissing()
+        {
+            Assert.Equal("N/A", StringTemplate.Render("{Missing ?? \"N/A\"}", new { Other = 1 }));
+        }
+
+        [Fact]
+        public void NullCoalesceSupportsBarewordFallback()
+        {
+            Assert.Equal("none", StringTemplate.Render("{Name ?? none}", new { Name = (string)null }));
+        }
+
+        [Fact]
+        public void DeepDotNotationFlattensCorrectly()
+        {
+            var data = new { A = new { B = new { C = "deep" } } };
+            Assert.Equal("deep", StringTemplate.Render("{A.B.C}", data));
+        }
+
+        [Fact]
+        public void NullReferenceTypePropertyDoesNotThrow()
+        {
+            // A null reference-type property must not crash the reflection walk (it must not recurse into null).
+            var data = new NullableHolder { Child = null, Name = "John" };
+            Assert.Equal("Hello John", StringTemplate.Render("Hello {Name}", data));
+        }
+    }
+
+    public class NullableHolder
+    {
+        public NullableHolder Child { get; set; }
+        public string Name { get; set; }
     }
 
     public class BaseEntity

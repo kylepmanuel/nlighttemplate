@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -84,11 +85,13 @@ namespace NLightTemplate
             string prefix(string p) => string.IsNullOrEmpty(p) ? "" : $"{p}.";
 
             IEnumerable<KeyValuePair<string, object>> CollectProperties(string pre, object o) =>
-                PublicProperties(o.GetType())
-                    .SelectMany(prop => new[] { new KeyValuePair<string, object>($"{prefix(pre)}{prop.Name}", prop.GetValue(o)) }
-                    .Concat((prop.PropertyType.GetTypeInfo().IsClass && prop.PropertyType != typeof(string) && !typeof(IEnumerable).GetTypeInfo().IsAssignableFrom(prop.PropertyType.GetTypeInfo())) ?
-                        CollectProperties($"{prefix(pre)}{prop.Name}", prop.GetValue(o))
-                        .Select(kvp => new KeyValuePair<string, object>($"{prefix(pre)}{kvp.Key}", kvp.Value)) : new KeyValuePair<string, object>[0]));
+                Accessors(o.GetType()).SelectMany(a =>
+                {
+                    var name = $"{prefix(pre)}{a.Name}";
+                    var value = a.Getter(o);
+                    var head = new[] { new KeyValuePair<string, object>(name, value) };
+                    return a.Recurse && value != null ? head.Concat(CollectProperties(name, value)) : head;
+                });
 
             return CollectProperties(string.Empty, obj).ToDictionary(x => x.Key, x => x.Value);
         }
@@ -104,6 +107,36 @@ namespace NLightTemplate
                 foreach (var property in current.GetTypeInfo().DeclaredProperties)
                     if ((property.GetMethod?.IsPublic ?? false) && seen.Add(property.Name))
                         yield return property;
+        }
+
+        /// <summary>
+        /// Per-type cache of compiled property accessors: each entry is the property name, a compiled getter
+        /// delegate (far faster than reflection on repeat renders), and whether to recurse for dot notation.
+        /// Keyed by <see cref="Type"/>, so it is bounded by the number of distinct POCO types the app renders
+        /// (dynamic/<see cref="System.Dynamic.ExpandoObject"/> inputs use a different path and never populate this).
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, (string Name, Func<object, object> Getter, bool Recurse)[]> _accessorCache
+            = new ConcurrentDictionary<Type, (string Name, Func<object, object> Getter, bool Recurse)[]>();
+
+        private static (string Name, Func<object, object> Getter, bool Recurse)[] Accessors(Type type) =>
+            _accessorCache.GetOrAdd(type, t => PublicProperties(t).Select(p =>
+            {
+                var pt = p.PropertyType;
+                var recurse = pt.GetTypeInfo().IsClass && pt != typeof(string) && !typeof(IEnumerable).GetTypeInfo().IsAssignableFrom(pt.GetTypeInfo());
+                return (p.Name, CompileGetter(p), recurse);
+            }).ToArray());
+
+        /// <summary>
+        /// Compiles a property getter into a <c>Func&lt;object, object&gt;</c> via an expression tree, so subsequent
+        /// reads avoid reflection.
+        /// </summary>
+        private static Func<object, object> CompileGetter(PropertyInfo property)
+        {
+            var instance = Expression.Parameter(typeof(object), "instance");
+            var body = Expression.Convert(
+                Expression.Property(Expression.Convert(instance, property.DeclaringType), property),
+                typeof(object));
+            return Expression.Lambda<Func<object, object>>(body, instance).Compile();
         }
 
         /// <summary>
@@ -165,7 +198,9 @@ namespace NLightTemplate
         /// <param name="replacements">The replacements</param>
         /// <param name="cfg">The configuration</param>
         /// <returns></returns>
-        internal static string ReplaceText(string text, Dictionary<string, object> replacements, StringTemplateConfiguration cfg) =>
+        internal static string ReplaceText(string text, Dictionary<string, object> replacements, StringTemplateConfiguration cfg)
+        {
+            var result =
             replacements.ToList().OrderBy((kvp) => (kvp.Value is IEnumerable && kvp.Value.GetType() != typeof(string)) ? 1 : 2).Aggregate(text, (c, k) =>
                 (k.Value is IEnumerable enumerable && !(k.Value is string) && c.IndexOf($"{cfg.OpenToken}{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") >= 0 && c.IndexOf($"{cfg.OpenToken}/{cfg.ForeachToken} {k.Key}{cfg.CloseToken}") > 0) ?
                     GetRegex(string.Format(
@@ -179,6 +214,10 @@ namespace NLightTemplate
                 :
                 ReplaceToken(c, k.Key, k.Value, cfg, replacements)
             );
+
+            // A `{Key ?? fallback}` whose key is not present in this scope resolves to the fallback.
+            return ResolveMissingCoalesce(result, cfg);
+        }
 
         /// <summary>
         /// Builds the per-item property dictionaries for a <c>foreach</c> body, adding loop metadata:
@@ -206,6 +245,14 @@ namespace NLightTemplate
 
         internal static string ReplaceToken(string original, string key, object value, StringTemplateConfiguration cfg, Dictionary<string, object> replacements)
         {
+            original = ReplaceConditionals(original, key, value, cfg, replacements);
+
+            // Nothing else to do unless a {Key...} token (scalar, format, or ?? fallback) references this key. This
+            // keeps the per-key work and the regex cache bounded by the template's tokens, not by how many data
+            // properties there are (important for free-form/ExpandoObject data with many, ever-changing keys).
+            if (original.IndexOf($"{cfg.OpenToken}{key}", StringComparison.Ordinal) < 0)
+                return original;
+
             var typeInfo = value?.GetType().GetTypeInfo();
             var toStringMethod = (typeInfo?.IsEnum ?? false ? typeInfo?.BaseType.GetTypeInfo() : typeInfo)?
                 .GetDeclaredMethods("ToString")
@@ -213,7 +260,14 @@ namespace NLightTemplate
                     p.GetParameters().Select(q => q.ParameterType).SequenceEqual(new Type[] { typeof(string) })
                 );
 
-            original = ReplaceConditionals(original, key, value, cfg, replacements);
+            // Null-coalesce: {Key ?? fallback} renders the value, or the (optionally quoted) fallback when null.
+            if (original.IndexOf("??", StringComparison.Ordinal) >= 0)
+            {
+                var coalescePattern = $@"{Regex.Escape(cfg.OpenToken)}{Regex.Escape(key)}\s*\?\?\s*(?<fallback>(?:(?!{Regex.Escape(cfg.CloseToken)}).)+){Regex.Escape(cfg.CloseToken)}";
+                original = GetRegex(coalescePattern).Matches(original).Cast<Match>().Aggregate(original, (s, m) =>
+                    s.Replace(m.Value, value == null ? Unquote(m.Groups["fallback"].Value) : value.ToString()));
+            }
+
             original = original.Replace($"{cfg.OpenToken}{key}{cfg.CloseToken}", value?.ToString() ?? string.Empty);
 
             // Escape the tokens and key (they can contain regex metacharacters, and dotted keys contain '.'),
@@ -242,14 +296,22 @@ namespace NLightTemplate
 
         /// <summary>
         /// Cache of <see cref="Regex"/> instances keyed by pattern and options. The relatively expensive pattern
-        /// parsing happens once per distinct pattern and is reused across renders.
+        /// parsing happens once per distinct pattern and is reused across renders. It is bounded to
+        /// <see cref="RegexCacheLimit"/> entries so a long-running app that renders many distinct templates cannot
+        /// grow it without limit; when the limit is reached the cache is cleared and repopulated on demand.
         /// </summary>
         private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options), Regex> _regexCache = new ConcurrentDictionary<(string Pattern, RegexOptions Options), Regex>();
+
+        private const int RegexCacheLimit = 1024;
 
         /// <summary>
         /// Returns a cached <see cref="Regex"/> for the pattern/options, building it on first use.
         /// </summary>
-        private static Regex GetRegex(string pattern, RegexOptions options = RegexOptions.None) => _regexCache.GetOrAdd((pattern, options), key => new Regex(key.Pattern, key.Options));
+        private static Regex GetRegex(string pattern, RegexOptions options = RegexOptions.None)
+        {
+            if (_regexCache.Count >= RegexCacheLimit) _regexCache.Clear();
+            return _regexCache.GetOrAdd((pattern, options), key => new Regex(key.Pattern, key.Options));
+        }
 
         /// <summary>
         /// Resolves <c>{if Key}</c>/<c>{if Key op value}</c> conditional blocks (with optional <c>{else}</c>) for the supplied key.
@@ -266,18 +328,17 @@ namespace NLightTemplate
         /// <returns></returns>
         internal static string ReplaceConditionals(string original, string key, object value, StringTemplateConfiguration cfg, Dictionary<string, object> replacements)
         {
-            if (original.IndexOf($"{cfg.OpenToken}{cfg.IfToken} {key}", StringComparison.Ordinal) < 0
-                || original.IndexOf($"{cfg.OpenToken}/{cfg.IfToken} {key}{cfg.CloseToken}", StringComparison.Ordinal) < 0)
+            if (original.IndexOf($"{cfg.OpenToken}/{cfg.IfToken} {key}{cfg.CloseToken}", StringComparison.Ordinal) < 0)
                 return original;
 
-            var openPrefix = Escape($"{cfg.OpenToken}{cfg.IfToken} {key}");
+            var ifLead = Escape($"{cfg.OpenToken}{cfg.IfToken} ");
+            var escKey = Escape(key);
             var closeTag = Escape($"{cfg.OpenToken}/{cfg.IfToken} {key}{cfg.CloseToken}");
             var closeTok = Escape(cfg.CloseToken);
-            // after the key there must be no further identifier char (so "Age" never matches "AgeGroup"); the optional
-            // condition is any run of characters up to the close token.
+            // Optional leading '!' negates the condition; the boundary stops "Age" from also matching "AgeGroup".
             var boundary = $@"(?![\p{{L}}\p{{Nd}}_.])";
-            var openCap = $@"{openPrefix}{boundary}(?<cond>(?:(?!{closeTok}).)*){closeTok}";
-            var openNc = $@"{openPrefix}{boundary}(?:(?!{closeTok}).)*{closeTok}";
+            var openCap = $@"{ifLead}(?<neg>!\s*)?{escKey}{boundary}(?<cond>(?:(?!{closeTok}).)*){closeTok}";
+            var openNc = $@"{ifLead}(?:!\s*)?{escKey}{boundary}(?:(?!{closeTok}).)*{closeTok}";
 
             var rx = GetRegex(
                 $@"{openCap}(?<inner>(?>{openNc}(?<LEVEL>)|{closeTag}(?<-LEVEL>)|(?!{openNc}|{closeTag}).)+(?(LEVEL)(?!))){closeTag}",
@@ -287,20 +348,45 @@ namespace NLightTemplate
             {
                 var outcome = EvaluateCondition(value, match.Groups["cond"].Value.Trim(), replacements);
                 if (!outcome.HasValue) return acc; // undecidable (boolean form on a non-bool, or unparseable) -> leave verbatim
-                SplitElse(match.Groups["inner"].Value, cfg, out string truePart, out string elsePart);
-                return acc.Replace(match.Captures[0].Value, ReplaceConditionals(outcome.Value ? truePart : elsePart, key, value, cfg, replacements));
+                var matched = match.Groups["neg"].Success ? !outcome.Value : outcome.Value;
+
+                SplitConditionalSegments(match.Groups["inner"].Value, cfg, out var firstContent, out var elseIfs, out var elseContent);
+
+                string chosen;
+                if (matched)
+                    chosen = firstContent;
+                else
+                {
+                    chosen = null;
+                    foreach (var branch in elseIfs)
+                        if (EvaluateExpression(branch.Expr, replacements) == true) { chosen = branch.Content; break; }
+                    if (chosen == null) chosen = elseContent;
+                }
+
+                return acc.Replace(match.Captures[0].Value, ReplaceConditionals(chosen ?? string.Empty, key, value, cfg, replacements));
             });
         }
 
         /// <summary>
-        /// Splits an <c>{if}</c> block's inner content on its own (depth-0) <c>{else}</c> marker, skipping any
-        /// <c>{else}</c> that belongs to a nested <c>{if}</c> block.
+        /// Splits an <c>{if}</c> block's inner content at its own (depth-0) <c>{else if ...}</c> and <c>{else}</c>
+        /// markers, skipping any that belong to a nested <c>{if}</c> block. Returns the content before the first
+        /// marker, the ordered else-if branches (each an expression and its content), and the else content (or null).
         /// </summary>
-        private static void SplitElse(string inner, StringTemplateConfiguration cfg, out string truePart, out string elsePart)
+        private static void SplitConditionalSegments(string inner, StringTemplateConfiguration cfg,
+            out string firstContent, out List<(string Expr, string Content)> elseIfs, out string elseContent)
         {
-            truePart = inner;
-            elsePart = string.Empty;
-            var rx = GetRegex($@"(?<ifc>{Escape($"{cfg.OpenToken}/{cfg.IfToken} ")})|(?<ifo>{Escape($"{cfg.OpenToken}{cfg.IfToken} ")})|(?<els>{Escape($"{cfg.OpenToken}{cfg.ElseToken}{cfg.CloseToken}")})");
+            firstContent = inner;
+            elseIfs = new List<(string Expr, string Content)>();
+            elseContent = null;
+
+            var closeTok = Escape(cfg.CloseToken);
+            var rx = GetRegex(
+                $@"(?<ifc>{Escape($"{cfg.OpenToken}/{cfg.IfToken} ")})" +
+                $@"|(?<ifo>{Escape($"{cfg.OpenToken}{cfg.IfToken} ")})" +
+                $@"|(?<elif>{Escape($"{cfg.OpenToken}{cfg.ElseToken} {cfg.IfToken} ")}(?<expr>(?:(?!{closeTok}).)*){closeTok})" +
+                $@"|(?<els>{Escape($"{cfg.OpenToken}{cfg.ElseToken}{cfg.CloseToken}")})");
+
+            var boundaries = new List<(int Index, int Length, bool IsElse, string Expr)>();
             var depth = 0;
             foreach (Match m in rx.Matches(inner))
             {
@@ -308,11 +394,62 @@ namespace NLightTemplate
                 else if (m.Groups["ifc"].Success) { if (depth > 0) depth--; }
                 else if (depth == 0)
                 {
-                    truePart = inner.Substring(0, m.Index);
-                    elsePart = inner.Substring(m.Index + m.Length);
-                    return;
+                    if (m.Groups["elif"].Success) boundaries.Add((m.Index, m.Length, false, m.Groups["expr"].Value));
+                    else boundaries.Add((m.Index, m.Length, true, null));
                 }
             }
+
+            if (boundaries.Count == 0) return;
+
+            firstContent = inner.Substring(0, boundaries[0].Index);
+            for (var i = 0; i < boundaries.Count; i++)
+            {
+                var b = boundaries[i];
+                var start = b.Index + b.Length;
+                var end = i + 1 < boundaries.Count ? boundaries[i + 1].Index : inner.Length;
+                var content = inner.Substring(start, end - start);
+                if (b.IsElse) elseContent = content;
+                else elseIfs.Add((b.Expr, content));
+            }
+        }
+
+        /// <summary>
+        /// Evaluates an <c>{else if ...}</c> expression: an optional leading <c>!</c> negates it, the key is looked up
+        /// in <paramref name="replacements"/>, and the remainder is the condition. Returns <c>null</c> when undecidable.
+        /// </summary>
+        private static bool? EvaluateExpression(string expr, Dictionary<string, object> replacements)
+        {
+            expr = expr.Trim();
+            var neg = false;
+            if (expr.StartsWith("!", StringComparison.Ordinal)) { neg = true; expr = expr.Substring(1).TrimStart(); }
+
+            var keyMatch = GetRegex(@"^[\p{L}\p{Nd}_.]+").Match(expr);
+            if (!keyMatch.Success) return null;
+
+            var v = replacements != null && replacements.TryGetValue(keyMatch.Value, out var val) ? val : null;
+            var outcome = EvaluateCondition(v, expr.Substring(keyMatch.Length).Trim(), replacements);
+            if (!outcome.HasValue) return null;
+            return neg ? !outcome.Value : outcome.Value;
+        }
+
+        /// <summary>
+        /// Resolves any remaining <c>{Key ?? fallback}</c> tokens (whose key was not present in scope) to the fallback.
+        /// </summary>
+        private static string ResolveMissingCoalesce(string text, StringTemplateConfiguration cfg)
+        {
+            if (text.IndexOf("??", StringComparison.Ordinal) < 0) return text;
+            var pattern = $@"{Regex.Escape(cfg.OpenToken)}[\p{{L}}\p{{Nd}}_.]+\s*\?\?\s*(?<fallback>(?:(?!{Regex.Escape(cfg.CloseToken)}).)+){Regex.Escape(cfg.CloseToken)}";
+            return GetRegex(pattern).Matches(text).Cast<Match>().Aggregate(text, (s, m) =>
+                s.Replace(m.Value, Unquote(m.Groups["fallback"].Value)));
+        }
+
+        /// <summary>
+        /// Strips a single pair of surrounding double quotes from a fallback literal, if present.
+        /// </summary>
+        private static string Unquote(string s)
+        {
+            s = s.Trim();
+            return s.Length >= 2 && s[0] == '"' && s[s.Length - 1] == '"' ? s.Substring(1, s.Length - 2) : s;
         }
 
         /// <summary>

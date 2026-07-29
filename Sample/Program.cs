@@ -12,20 +12,22 @@ internal static class Program
     {
         var customer = BuildDemoCustomer();
 
-        // One template exercising the current feature set:
+        // One template exercising the feature set:
         //  - dot notation ({ShippingAddress.City}) and inherited properties ({Id}, {CreatedUtc} come from Entity)
-        //  - {if} with enum matching ({if Level == Gold}), numeric comparison, property-to-property (@RewardThreshold), and {else}
+        //  - {if}/{else if}/{else} with enum matching, negation (!), numeric and property-to-property (@) comparisons
+        //  - null-coalesce fallback ({TrackingNumber ?? "pending"})
         //  - {foreach} over a custom IEnumerable, with loop metadata: {index} (0-based), {first}, {last}, {count}
-        //  - nested {foreach}, boolean {if}, and format specifiers ({Placed:yyyy-MM-dd}, {UnitPrice:C})
+        //  - nested {foreach} and format specifiers ({Placed:yyyy-MM-dd}, {UnitPrice:C})
         const string template =
 @"Hi {FullName}, thanks for your order!
 
 Account #{Id}, member since {CreatedUtc:yyyy-MM-dd}. Shipping to {ShippingAddress.City}, {ShippingAddress.Country}.
-{if Level == Gold}Gold member: express shipping is free.{else}Upgrade to Gold for free express shipping.{/if Level}
+{if Level == Gold}Gold member: express shipping is free.{else if Level == Standard}Standard member: free shipping on orders over $50.{else}Create an account to start earning rewards.{/if Level}
 {if LoyaltyPoints >= @RewardThreshold}You have {LoyaltyPoints} points, enough to redeem a reward!{else}{LoyaltyPoints} of {RewardThreshold} points to your next reward.{/if LoyaltyPoints}
 
 You have {OrderCount} recent order(s):
-{foreach Orders}  [{index}] Order #{Id} placed {Placed:yyyy-MM-dd}{if first} (latest){/if first} - {if Shipped}shipped{else}processing{/if Shipped}
+{foreach Orders}  [{index}] Order #{Id} placed {Placed:yyyy-MM-dd}{if first} (latest){/if first} - {if !Shipped}processing{else}shipped{/if Shipped}
+      Tracking: {TrackingNumber ?? ""pending""}
 {foreach Lines}      {Quantity} x {Product} @ {UnitPrice:C} = {Subtotal:C}
 {/foreach Lines}      Order total: {Total:C} {if Total >= 50}(free shipping){else}(+ $5.00 shipping){/if Total}
 {if last}      that's all {count} order(s).
@@ -52,7 +54,7 @@ Questions? Email {supportEmail}.";
         CreatedUtc = new DateTime(2019, 3, 14),
         FirstName = "John",
         LastName = "Doe",
-        Level = Membership.Gold,
+        Level = Membership.Standard,
         LoyaltyPoints = 1200,
         RewardThreshold = 1000,
         ShippingAddress = new Address { City = "Austin", Country = "USA" },
@@ -76,6 +78,7 @@ Questions? Email {supportEmail}.";
                 CreatedUtc = new DateTime(2024, 6, 18),
                 Placed = new DateTime(2024, 6, 18),
                 Shipped = true,
+                TrackingNumber = "1Z999AA10123456784", // order 124 leaves this null -> "pending" via {?? }
                 Lines =
                 [
                     new OrderLine { Product = "Blue Shirt", Quantity = 1, UnitPrice = 12.35 },
@@ -117,6 +120,7 @@ public class Order : Entity
 {
     public DateTime Placed { get; set; }
     public bool Shipped { get; set; }
+    public string TrackingNumber { get; set; }
     public List<OrderLine> Lines { get; set; }
     public double Total => Lines?.Sum(l => l.Subtotal) ?? 0;
 }
