@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.2.0] - unreleased
+## [2.2.0] - 2026-07-29
 
 ### Added
 - `{else if}` chains and negation (`!`) in conditions: `{if A}...{else if B}...{else}...{/if A}` renders the first matching branch, and an `{else if ...}` can test any property. Prefix any condition with `!` to negate it, for example `{if !IsActive}`.
