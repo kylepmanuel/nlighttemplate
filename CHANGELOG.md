@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - Output-formatting options on `StringTemplateConfiguration` (all off by default): `FormatProvider` applies an `IFormatProvider` / culture to format specifiers; `HtmlEncode` HTML-encodes substituted values (not the template literals); `TrimBlockWhitespace` trims whitespace and a trailing newline around block tags so control tags on their own line do not leave blank lines. Each has a fluent setter and is carried through `ITemplateRenderer`.
+- Custom type formatters: `Format<T>(value => ...)` registers a callback that controls how values of type `T` render. An explicit format specifier on a token still overrides the formatter.
 
 ## [2.2.0] - 2026-07-29
 

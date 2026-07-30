@@ -26,6 +26,8 @@ namespace NLightTemplate
         bool HtmlEncode { get; }
         /// <summary>When true, trims whitespace and newlines around block tags (default false)</summary>
         bool TrimBlockWhitespace { get; }
+        /// <summary>Per-type formatting callbacks that control how a value of that exact type renders (when no explicit format specifier is given)</summary>
+        IReadOnlyDictionary<Type, Func<object, string>> TypeFormatters { get; }
     }
 
     /// <summary>
@@ -69,6 +71,13 @@ namespace NLightTemplate
         /// Default false.
         /// </summary>
         public bool TrimBlockWhitespace { get; set; }
+        /// <summary>
+        /// Per-type formatting callbacks (keyed by exact type) that control how a value of that type renders when no
+        /// explicit format specifier is given. Register via <see cref="FluentStringTemplateConfiguration.Format{T}"/>
+        /// or by adding to this dictionary directly.
+        /// </summary>
+        public Dictionary<Type, Func<object, string>> TypeFormatters { get; } = new Dictionary<Type, Func<object, string>>();
+        IReadOnlyDictionary<Type, Func<object, string>> IStringTemplateConfiguration.TypeFormatters => TypeFormatters;
 
         /// <summary>
         /// Builds a <see cref="StringTemplateConfiguration"/> using the fluent interface. Convenient for
@@ -184,6 +193,18 @@ namespace NLightTemplate
         public FluentStringTemplateConfiguration TrimBlockWhitespace(bool trim = true)
         {
             _cfg.TrimBlockWhitespace = trim;
+            return this;
+        }
+        /// <summary>
+        /// Registers a formatter that controls how values of type <typeparamref name="T"/> render (when no explicit
+        /// format specifier is given). See <see cref="StringTemplateConfiguration.TypeFormatters"/>.
+        /// </summary>
+        /// <typeparam name="T">The value type to format</typeparam>
+        /// <param name="formatter">Callback that turns a value into its rendered string</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration Format<T>(Func<T, string> formatter)
+        {
+            _cfg.TypeFormatters[typeof(T)] = value => formatter((T)value);
             return this;
         }
         /// <summary>

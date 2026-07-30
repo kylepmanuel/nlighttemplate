@@ -291,6 +291,9 @@ namespace NLightTemplate
         private static string FormatValue(object value, string format, StringTemplateConfiguration cfg)
         {
             if (value == null) return string.Empty;
+            // A registered per-type formatter provides the default rendering (an explicit format specifier overrides it).
+            if (string.IsNullOrEmpty(format) && cfg.TypeFormatters.TryGetValue(value.GetType(), out var formatter))
+                return formatter(value);
             if (value is IFormattable formattable && (!string.IsNullOrEmpty(format) || cfg.FormatProvider != null))
                 return formattable.ToString(string.IsNullOrEmpty(format) ? null : format, cfg.FormatProvider);
             return value.ToString();

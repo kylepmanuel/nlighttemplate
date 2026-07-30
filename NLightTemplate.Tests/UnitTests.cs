@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using NLightTemplate.Tests.Generators;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Dynamic;
@@ -247,6 +248,32 @@ namespace NLightTemplate.Tests
             var data = new { Items = new[] { new { Name = "A" }, new { Name = "B" } } };
             Assert.Equal("Items:\n- A\n- B\nDone", StringTemplate.Render(template, data, cfg));
         }
+
+        [Fact]
+        public void CustomTypeFormatterControlsRendering()
+        {
+            var cfg = new FluentStringTemplateConfiguration()
+                .Format<Money>(m => $"{m.Currency} {m.Amount:0.00}")
+                .ExposeConfiguration();
+            var data = new { Price = new Money { Amount = 12.5m, Currency = "USD" } };
+            Assert.Equal("Total: USD 12.50", StringTemplate.Render("Total: {Price}", data, cfg));
+        }
+
+        [Fact]
+        public void ExplicitFormatSpecifierOverridesTypeFormatter()
+        {
+            var cfg = new FluentStringTemplateConfiguration()
+                .Format<DateTime>(d => "CUSTOM")
+                .ExposeConfiguration();
+            var data = new { When = new DateTime(2020, 1, 2) };
+            Assert.Equal("CUSTOM | 2020", StringTemplate.Render("{When} | {When:yyyy}", data, cfg));
+        }
+    }
+
+    public class Money
+    {
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
     }
 
     public class NullableHolder
@@ -287,6 +314,8 @@ namespace NLightTemplate.Tests
         public System.IFormatProvider FormatProvider => null;
         public bool HtmlEncode => false;
         public bool TrimBlockWhitespace => false;
+        public System.Collections.Generic.IReadOnlyDictionary<System.Type, System.Func<object, string>> TypeFormatters =>
+            new System.Collections.Generic.Dictionary<System.Type, System.Func<object, string>>();
     }
 
     public static class Extensions
