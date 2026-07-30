@@ -16,6 +16,7 @@ This was born out of a recurring need (and subsequent fractured code bases) for 
  * Dot notation property accessors for reference types
  * Conditionals: boolean `{if}`/`{else}`/`{else if}`, negation (`!`), comparison operators (`==`, `!=`, `>`, `<`, `>=`, `<=`), property-to-property (`@`) and enum-aware comparisons
  * Inline null-coalesce fallback (`{Prop ?? "N/A"}`)
+ * Output options: configurable culture (`IFormatProvider`), HTML encoding, block-tag whitespace trimming, and per-type formatters
  * Usable as a static class or via an injectable `ITemplateRenderer`
  * Familiar syntax (using default configuration)
 
@@ -220,6 +221,23 @@ Provide an inline fallback for a null or missing value with ```??```. The fallba
 StringTemplate.Render("Hello {Name ?? \"there\"}!", customer); // "Hello there!" when Name is null/missing
 ```
 
+#### Output options
+These configuration options control output formatting, all off by default:
+ * **Culture**: ```FormatProvider``` applies an ```IFormatProvider``` (for example a ```CultureInfo```) to format specifiers.
+ * **HTML encoding**: ```HtmlEncode``` HTML-encodes substituted values (not the template literals) for safe HTML or email output.
+ * **Whitespace trimming**: ```TrimBlockWhitespace``` trims horizontal whitespace before, and a trailing newline after, block tags, so control tags on their own line do not leave blank lines.
+ * **Custom type formatters**: ```Format<T>(...)``` registers a callback that controls how values of type ```T``` render (an explicit format specifier on a token still overrides it).
+
+```cs
+var cfg = new FluentStringTemplateConfiguration()
+    .FormatProvider(new CultureInfo("de-DE"))
+    .HtmlEncode()
+    .TrimBlockWhitespace()
+    .Format<Money>(m => $"{m.Currency} {m.Amount:0.00}")
+    .ExposeConfiguration();
+StringTemplate.Render(template, model, cfg);
+```
+
 #### Dependency Injection
 In addition to the static ```StringTemplate``` class, an instance-based ```ITemplateRenderer``` / ```TemplateRenderer``` is provided for DI-first applications. It carries its own configuration and delegates to the same engine. **NLightTemplate takes no dependency on any DI container**, so you register it yourself:
 ```cs
@@ -303,7 +321,7 @@ Benchmark the library against your own template and data with the [benchmark pro
 - [x] Fallback null coalesce: provide an inline fallback for null or missing values, for example `{Prop ?? "N/A"}` (released in 2.2)
 
 **Output and formatting**
-- [ ] HTML encoding option: optionally HTML-encode substituted values for safe server-side HTML/email rendering (expected 2.3)
-- [ ] Whitespace/newline trimming: optionally trim whitespace and newlines around block tags for cleaner output (expected 2.3)
-- [ ] Configurable culture: let rendering use a configurable culture / `IFormatProvider` instead of the default (expected 2.3)
-- [ ] Custom type formatters: register per-type formatting callbacks to control how specific types render (expected 2.4)
+- [x] HTML encoding option: optionally HTML-encode substituted values for safe server-side HTML/email rendering (released in 2.3)
+- [x] Whitespace/newline trimming: optionally trim whitespace and newlines around block tags for cleaner output (released in 2.3)
+- [x] Configurable culture: let rendering use a configurable culture / `IFormatProvider` instead of the default (released in 2.3)
+- [x] Custom type formatters: register per-type formatting callbacks to control how specific types render (released 2.3)

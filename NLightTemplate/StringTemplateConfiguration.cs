@@ -20,6 +20,14 @@ namespace NLightTemplate
         string IfToken { get; }
         /// <summary>The Else token (default "else")</summary>
         string ElseToken { get; }
+        /// <summary>Format provider for format specifiers (default null = current culture)</summary>
+        IFormatProvider FormatProvider { get; }
+        /// <summary>When true, HTML-encodes substituted values (default false)</summary>
+        bool HtmlEncode { get; }
+        /// <summary>When true, trims whitespace and newlines around block tags (default false)</summary>
+        bool TrimBlockWhitespace { get; }
+        /// <summary>Per-type formatting callbacks that control how a value of that exact type renders (when no explicit format specifier is given)</summary>
+        IReadOnlyDictionary<Type, Func<object, string>> TypeFormatters { get; }
     }
 
     /// <summary>
@@ -47,6 +55,29 @@ namespace NLightTemplate
         /// The Else token (default "else")
         /// </summary>
         public string ElseToken { get; set; } = "else";
+        /// <summary>
+        /// The <see cref="IFormatProvider"/> (for example a <see cref="System.Globalization.CultureInfo"/>) used for
+        /// format specifiers. Default null uses the current culture.
+        /// </summary>
+        public IFormatProvider FormatProvider { get; set; }
+        /// <summary>
+        /// When true, HTML-encodes the substituted values (not the template literals) for safe HTML/email output.
+        /// Default false.
+        /// </summary>
+        public bool HtmlEncode { get; set; }
+        /// <summary>
+        /// When true, trims horizontal whitespace before, and a single trailing newline after, each block tag
+        /// (<c>foreach</c>, <c>if</c>, <c>else</c>) so control tags on their own line do not leave blank lines.
+        /// Default false.
+        /// </summary>
+        public bool TrimBlockWhitespace { get; set; }
+        /// <summary>
+        /// Per-type formatting callbacks (keyed by exact type) that control how a value of that type renders when no
+        /// explicit format specifier is given. Register via <see cref="FluentStringTemplateConfiguration.Format{T}"/>
+        /// or by adding to this dictionary directly.
+        /// </summary>
+        public Dictionary<Type, Func<object, string>> TypeFormatters { get; } = new Dictionary<Type, Func<object, string>>();
+        IReadOnlyDictionary<Type, Func<object, string>> IStringTemplateConfiguration.TypeFormatters => TypeFormatters;
 
         /// <summary>
         /// Builds a <see cref="StringTemplateConfiguration"/> using the fluent interface. Convenient for
@@ -130,6 +161,50 @@ namespace NLightTemplate
         public FluentStringTemplateConfiguration ElseToken(string elseToken)
         {
             _cfg.ElseToken = elseToken;
+            return this;
+        }
+        /// <summary>
+        /// Sets the <see cref="StringTemplateConfiguration.FormatProvider"/> (for example a
+        /// <see cref="System.Globalization.CultureInfo"/>) used for format specifiers.
+        /// </summary>
+        /// <param name="formatProvider">The format provider</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration FormatProvider(IFormatProvider formatProvider)
+        {
+            _cfg.FormatProvider = formatProvider;
+            return this;
+        }
+        /// <summary>
+        /// Enables (or disables) HTML-encoding of substituted values (<see cref="StringTemplateConfiguration.HtmlEncode"/>).
+        /// </summary>
+        /// <param name="htmlEncode">Whether to HTML-encode values</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration HtmlEncode(bool htmlEncode = true)
+        {
+            _cfg.HtmlEncode = htmlEncode;
+            return this;
+        }
+        /// <summary>
+        /// Enables (or disables) trimming of whitespace and newlines around block tags
+        /// (<see cref="StringTemplateConfiguration.TrimBlockWhitespace"/>).
+        /// </summary>
+        /// <param name="trim">Whether to trim block-tag whitespace</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration TrimBlockWhitespace(bool trim = true)
+        {
+            _cfg.TrimBlockWhitespace = trim;
+            return this;
+        }
+        /// <summary>
+        /// Registers a formatter that controls how values of type <typeparamref name="T"/> render (when no explicit
+        /// format specifier is given). See <see cref="StringTemplateConfiguration.TypeFormatters"/>.
+        /// </summary>
+        /// <typeparam name="T">The value type to format</typeparam>
+        /// <param name="formatter">Callback that turns a value into its rendered string</param>
+        /// <returns></returns>
+        public FluentStringTemplateConfiguration Format<T>(Func<T, string> formatter)
+        {
+            _cfg.TypeFormatters[typeof(T)] = value => formatter((T)value);
             return this;
         }
         /// <summary>

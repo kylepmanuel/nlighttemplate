@@ -58,16 +58,26 @@ namespace NLightTemplate
         /// Normalizes any <see cref="IStringTemplateConfiguration"/> into the concrete <see cref="StringTemplateConfiguration"/>
         /// the static engine consumes: the instance itself when it already is one, otherwise a snapshot of its tokens.
         /// </summary>
-        private static StringTemplateConfiguration AsConfiguration(IStringTemplateConfiguration cfg) =>
-            cfg == null ? new StringTemplateConfiguration()
-            : cfg as StringTemplateConfiguration
-              ?? new StringTemplateConfiguration
-              {
-                  OpenToken = cfg.OpenToken,
-                  CloseToken = cfg.CloseToken,
-                  ForeachToken = cfg.ForeachToken,
-                  IfToken = cfg.IfToken,
-                  ElseToken = cfg.ElseToken
-              };
+        private static StringTemplateConfiguration AsConfiguration(IStringTemplateConfiguration cfg)
+        {
+            if (cfg == null) return new StringTemplateConfiguration();
+            if (cfg is StringTemplateConfiguration concrete) return concrete;
+
+            var snapshot = new StringTemplateConfiguration
+            {
+                OpenToken = cfg.OpenToken,
+                CloseToken = cfg.CloseToken,
+                ForeachToken = cfg.ForeachToken,
+                IfToken = cfg.IfToken,
+                ElseToken = cfg.ElseToken,
+                FormatProvider = cfg.FormatProvider,
+                HtmlEncode = cfg.HtmlEncode,
+                TrimBlockWhitespace = cfg.TrimBlockWhitespace
+            };
+            if (cfg.TypeFormatters != null)
+                foreach (var formatter in cfg.TypeFormatters)
+                    snapshot.TypeFormatters[formatter.Key] = formatter.Value;
+            return snapshot;
+        }
     }
 }
