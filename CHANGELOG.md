@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.3.0] - unreleased
+## [2.3.0] - 2026-07-30
 
 ### Added
 - Output-formatting options on `StringTemplateConfiguration` (all off by default): `FormatProvider` applies an `IFormatProvider` / culture to format specifiers; `HtmlEncode` HTML-encodes substituted values (not the template literals); `TrimBlockWhitespace` trims whitespace and a trailing newline around block tags so control tags on their own line do not leave blank lines. Each has a fluent setter and is carried through `ITemplateRenderer`.
